@@ -216,42 +216,6 @@ class acf_field_country extends acf_field
 
 
     /*
-    *  field_group_admin_enqueue_scripts()
-    *
-    *  This action is called in the admin_enqueue_scripts action on the edit screen where your field is edited.
-    *  Use this action to add css + javascript to assist your create_field_options() action.
-    *
-    *  $info    http://codex.wordpress.org/Plugin_API/Action_Reference/admin_enqueue_scripts
-    *  @type    action
-    *  @since   3.6
-    *  @date    23/01/13
-    */
-
-    function field_group_admin_enqueue_scripts()
-    {
-        // Note: This function can be removed if not used
-    }
-
-
-    /*
-    *  field_group_admin_head()
-    *
-    *  This action is called in the admin_head action on the edit screen where your field is edited.
-    *  Use this action to add css and javascript to assist your create_field_options() action.
-    *
-    *  @info    http://codex.wordpress.org/Plugin_API/Action_Reference/admin_head
-    *  @type    action
-    *  @since   3.6
-    *  @date    23/01/13
-    */
-
-    function field_group_admin_head()
-    {
-        // Note: This function can be removed if not used
-    }
-
-
-    /*
     *  load_value()
     *
     *  This filter is appied to the $value after it is loaded from the db
@@ -315,10 +279,7 @@ class acf_field_country extends acf_field
 
     function format_value($value, $post_id, $field)
     {
-        // defaults?
-        /*
         $field = array_merge($this->defaults, $field);
-        */
 
         // perhaps use $field['preview_size'] to alter the $value?
 
@@ -408,7 +369,30 @@ function get_country_cities()
 
     $country_id = (int) trim($_POST['countryId']);
 
-    $cities_db        = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."cities WHERE  country='".$country_id."'");
+    $cities_db        = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."cities WHERE  country='".$country_id."' ORDER BY city ASC");
+    $cities               = array();
+
+    if ($cities_db)
+    {
+        foreach ($cities_db AS $city)
+        {
+            $cities[$city->id] = $city->city;
+        }
+    }
+
+    echo json_encode($cities);
+
+    die();
+}
+
+add_action("wp_ajax_get_us_states", "get_us_states");
+function get_us_states()
+{
+    global $wpdb;
+
+    $country_id = (int) trim($_POST['countryId']);
+
+    $cities_db        = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."states ORDER BY state ASC");
     $cities               = array();
 
     if ($cities_db)
