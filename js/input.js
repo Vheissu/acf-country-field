@@ -13,7 +13,11 @@
                 if ($this.val() !== originalCountry) {
                     originalCountry = $this.val();
 
-                    var optionsValues = '';
+                    var optionsValues   = '';
+                    var $countryParent  = countryCity.parents("li");
+
+                    $countryParent.find(".field-inner").css("visibility", "hidden");
+                    $countryParent.find(".css3-loader").show();
 
                     get_related_cities($this.val(), function(response) {
                         countryCity.empty();
@@ -21,6 +25,8 @@
                             optionsValues += '<option value="'+k+'">'+v+'</option>';
                         });
                         countryCity.html(optionsValues);
+                        $countryParent.find(".field-inner").css("visibility", "visible");
+                        $countryParent.find(".css3-loader").hide();
                     });
 
                     if ($this.val() == 446) {
