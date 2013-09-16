@@ -390,8 +390,6 @@ function get_us_states()
 {
     global $wpdb;
 
-    $country_id = (int) trim($_POST['countryId']);
-
     $cities_db        = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."states ORDER BY state ASC");
     $cities               = array();
 
