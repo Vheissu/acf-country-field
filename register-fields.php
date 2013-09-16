@@ -128,49 +128,58 @@ class acf_field_country extends acf_field
 
             <ul class="country-selector-list">
                 <li id="field-<?php echo $key; ?>[country_name]">
-                    <strong><?php _e("Select your country", 'acf'); ?></strong><br />
+                    <div class="css3-loader" style="display:none;"><div class="spinner"></div></div>
+                    <div class="field-inner">
+                        <strong><?php _e("Select your country", 'acf'); ?></strong><br />
 
-                    <?php
+                        <?php
 
-                    $country_field = $field['name'] . '[country_name]';
-                    do_action('acf/create_field', array(
-                        'type'      =>  'select',
-                        'name'    =>  $country_field,
-                        'value'     =>  $country_id,
-                        'choices' =>  $countries,
-                    ));
+                        $country_field = $field['name'] . '[country_name]';
+                        do_action('acf/create_field', array(
+                            'type'      =>  'select',
+                            'name'    =>  $country_field,
+                            'value'     =>  $country_id,
+                            'choices' =>  $countries,
+                        ));
 
-                    ?>
+                        ?>
+                    </div>
                 </li>
                 <li id="field-<?php echo $key; ?>[country_city]">
-                    <strong><?php _e("Select your city", 'acf'); ?></strong><br />
+                    <div class="css3-loader" style="display:none;"><div class="spinner"></div></div>
+                    <div class="field-inner">
+                        <strong><?php _e("Select your city", 'acf'); ?></strong><br />
 
-                    <?php
+                        <?php
 
-                    $city_field = $field['name'] . '[country_city]';
-                    do_action('acf/create_field', array(
-                        'type'      =>  'select',
-                        'name'    =>  $city_field,
-                        'value'     =>  $city_id,
-                        'choices' =>  $cities,
-                    ));
+                        $city_field = $field['name'] . '[country_city]';
+                        do_action('acf/create_field', array(
+                            'type'      =>  'select',
+                            'name'    =>  $city_field,
+                            'value'     =>  $city_id,
+                            'choices' =>  $cities,
+                        ));
 
-                    ?>
+                        ?>
+                    </div>
                 </li>
                 <li id="field-<?php echo $key; ?>[country_state]" <?php if (empty($states)): ?>style="display:none;"<?php endif; ?>>
-                    <strong><?php _e("Select your state", 'acf'); ?></strong><br />
+                    <div class="css3-loader" style="display:none;"><div class="spinner"></div></div>
+                    <div class="field-inner">
+                        <strong><?php _e("Select your state", 'acf'); ?></strong><br />
 
-                    <?php
+                        <?php
 
-                    $state_field = $field['name'] . '[country_state]';
-                    do_action('acf/create_field', array(
-                        'type'      =>  'select',
-                        'name'    =>  $state_field,
-                        'value'     =>  $state_id,
-                        'choices' =>  $states,
-                    ));
+                        $state_field = $field['name'] . '[country_state]';
+                        do_action('acf/create_field', array(
+                            'type'      =>  'select',
+                            'name'    =>  $state_field,
+                            'value'     =>  $state_id,
+                            'choices' =>  $states,
+                        ));
 
-                    ?>
+                        ?>
+                    </div>
                 </li>
             </ul>
 
