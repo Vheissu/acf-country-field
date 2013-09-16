@@ -390,18 +390,18 @@ function get_us_states()
 {
     global $wpdb;
 
-    $cities_db        = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."states ORDER BY state ASC");
-    $cities               = array();
+    $states_db        = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."states ORDER BY state ASC");
+    $states               = array();
 
-    if ($cities_db)
+    if ($states_db)
     {
-        foreach ($cities_db AS $city)
+        foreach ($states_db AS $state)
         {
-            $cities[$city->id] = $city->city;
+            $states[$state->id] = $state->state;
         }
     }
 
-    echo json_encode($cities);
+    echo json_encode($state);
 
     die();
 }
