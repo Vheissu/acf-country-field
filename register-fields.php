@@ -82,10 +82,6 @@ class acf_field_country extends acf_field
     {
         $field = array_merge($this->defaults, $field);
 
-        $pattern = array('/\[/', '/\]/');
-        $replace = array('_', '');
-        $uid = preg_replace($pattern, $replace, $field['name']);
-
         $key             = $field['name'];
         $country_id = $field['value']['country_name'];
         $city_id        = $field['value']['country_city'];
