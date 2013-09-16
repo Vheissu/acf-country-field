@@ -145,7 +145,7 @@ class acf_field_country extends acf_field
                     </div>
                 </li>
                 <li id="field-<?php echo $key; ?>[country_city]">
-                    <div class="css3-loader" style="display:none;"><div class="spinner"></div></div>
+                    <div class="css3-loader" style="display:none;"><div class="css3-spinner"></div></div>
                     <div class="field-inner">
                         <strong><?php _e("Select your city", 'acf'); ?></strong><br />
 
@@ -163,7 +163,7 @@ class acf_field_country extends acf_field
                     </div>
                 </li>
                 <li id="field-<?php echo $key; ?>[country_state]" <?php if (empty($states)): ?>style="display:none;"<?php endif; ?>>
-                    <div class="css3-loader" style="display:none;"><div class="spinner"></div></div>
+                    <div class="css3-loader" style="display:none;"><div class="css3-spinner"></div></div>
                     <div class="field-inner">
                         <strong><?php _e("Select your state", 'acf'); ?></strong><br />
 
