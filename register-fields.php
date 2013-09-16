@@ -128,7 +128,6 @@ class acf_field_country extends acf_field
 
             <ul class="country-selector-list">
                 <li id="field-<?php echo $key; ?>[country_name]">
-                    <div class="css3-loader" style="display:none;"><div class="spinner"></div></div>
                     <div class="field-inner">
                         <strong><?php _e("Select your country", 'acf'); ?></strong><br />
 
