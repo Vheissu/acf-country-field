@@ -1,0 +1,12 @@
+.country-selector-list {
+
+}
+
+.country-selector-list li {
+    margin: 0 0 10px 0;
+}
+
+    .country-selector-list li strong {
+        color: #287BC7;
+        line-height: 2;
+    }
