@@ -401,7 +401,7 @@ function get_us_states()
         }
     }
 
-    echo json_encode($state);
+    echo json_encode($states);
 
     die();
 }
