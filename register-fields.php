@@ -23,7 +23,7 @@ class acf_field_country extends acf_field
         $this->label = __('Country');
         $this->category = __("Basic",'acf'); // Basic, Content, Choice, etc
         $this->defaults = array(
-            "country_name" => 237,
+            "country_name" => 0,
             "country_city"     => 0,
             "country_state"  => 0,
         );
@@ -85,18 +85,24 @@ class acf_field_country extends acf_field
         $key             = $field['name'];
         $country_id = $field['value']['country_name'];
         $city_id        = $field['value']['country_city'];
+        $state_id      = $field['value']['country_state'];
 
         global $wpdb;
 
         $countries_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."countries ORDER BY country ASC");
         $cities_db        = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."cities WHERE  country='".$country_id."' ORDER BY city ASC");
+
         $countries        = array();
         $cities               = array();
+
+        // Only applies when United States is selected as a country
+        $states             = array();
 
         $cities[0] = "";
 
         foreach ($countries_db AS $country)
         {
+            if (trim($country->country) == '') continue;
             $countries[$country->id] = $country->country;
         }
 
@@ -104,6 +110,18 @@ class acf_field_country extends acf_field
         {
             if (trim($city->city) == '') continue;
             $cities[$city->id] = $city->city;
+        }
+
+        // If we have selected USA
+        if ($country_id == 446)
+        {
+            $states_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."states  ORDER BY state ASC");
+
+            foreach ($states_db AS $state)
+            {
+                if (trim($state->state) == '') continue;
+                $states[$state->id] = $state->state;
+            }
         }
         ?>
 
@@ -134,6 +152,21 @@ class acf_field_country extends acf_field
                         'name'    =>  $city_field,
                         'value'     =>  $city_id,
                         'choices' =>  $cities,
+                    ));
+
+                    ?>
+                </li>
+                <li id="field-<?php echo $key; ?>[country_state]" <?php if (empty($states)): ?>style="display:none;"<?php endif; ?>>
+                    <strong><?php _e("Select your state", 'acf'); ?></strong><br />
+
+                    <?php
+
+                    $state_field = $field['name'] . '[country_state]';
+                    do_action('acf/create_field', array(
+                        'type'      =>  'select',
+                        'name'    =>  $state_field,
+                        'value'     =>  $state_id,
+                        'choices' =>  $states,
                     ));
 
                     ?>
