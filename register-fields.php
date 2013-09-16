@@ -22,10 +22,11 @@ class acf_field_country extends acf_field
         $this->name = 'country';
         $this->label = __('Country');
         $this->category = __("Basic",'acf'); // Basic, Content, Choice, etc
+
         $this->defaults = array(
             "country_name" => 0,
             "country_city"     => 0,
-            "country_state"  => 0,
+            "country_state"  => "0",
         );
 
 
@@ -85,7 +86,7 @@ class acf_field_country extends acf_field
         $key             = $field['name'];
         $country_id = $field['value']['country_name'];
         $city_id        = $field['value']['country_city'];
-        $state_id      = $field['value']['country_state'];
+        $state_id      = (isset($field['value']['country_state'])) ? $field['value']['country_state'] : $field['country_state'];
 
         global $wpdb;
 
