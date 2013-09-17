@@ -3,6 +3,8 @@
         var originalCountry = 0;
         var countrySelect   = $('select[name*="country_name"]');
 
+        $(".country-selector-list select").chosen();
+
         if (countrySelect.length) {
             countrySelect.change(function() {
                 var $this              = $(this);

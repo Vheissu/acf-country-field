@@ -204,7 +204,9 @@ class acf_field_country extends acf_field
 
         // register acf scripts
         wp_register_script('acf-input-country', $this->settings['dir'] . 'js/input.js', array('acf-input'), $this->settings['version']);
+        wp_register_script('acf-input-chosen', $this->settings['dir'] . 'js/chosen.jquery.min.js', array('jquery'), $this->settings['version']);
         wp_register_style('acf-input-country', $this->settings['dir'] . 'css/input.css', array('acf-input'), $this->settings['version']);
+        wp_register_style('acf-input-chosen', $this->settings['dir'] . 'css/chosen.min.css', array(), $this->settings['version']);
 
         wp_localize_script( 'acf-input-country', "acfCountry", array(
             "ajaxurl" => admin_url("admin-ajax.php"),
@@ -214,11 +216,13 @@ class acf_field_country extends acf_field
         // scripts
         wp_enqueue_script(array(
             'acf-input-country',
+            'acf-input-chosen',
         ));
 
         // styles
         wp_enqueue_style(array(
             'acf-input-country',
+            'acf-input-chosen',
         ));
 
     }
