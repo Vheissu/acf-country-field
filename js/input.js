@@ -3,7 +3,9 @@
         var originalCountry = 0;
         var countrySelect   = $('select[name*="country_name"]');
 
-        $(".country-selector-list select").chosen();
+        $(".country-selector-list select").chosen({
+            disable_search_threshold: 10
+        });
 
         if (countrySelect.length) {
             countrySelect.change(function() {
