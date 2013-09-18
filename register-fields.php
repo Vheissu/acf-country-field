@@ -135,10 +135,11 @@ class acf_field_country extends acf_field
 
                         $country_field = $field['name'] . '[country_name]';
                         do_action('acf/create_field', array(
-                            'type'      =>  'select',
-                            'name'    =>  $country_field,
-                            'value'     =>  $country_id,
-                            'choices' =>  $countries,
+                            'type'            =>  'select',
+                            'name'          =>  $country_field,
+                            'value'           =>  $country_id,
+                            'choices'       =>  $countries,
+                            'placeholder' => 'Choose a country...'
                         ));
 
                         ?>

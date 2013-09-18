@@ -26,7 +26,7 @@
                         $.each(response, function(k, v) {
                             optionsValues += '<option value="'+k+'">'+v+'</option>';
                         });
-                        countryCity.html(optionsValues);
+                        countryCity.html(optionsValues).trigger("chosen:updated");
                         $countryParent.find(".field-inner").css("visibility", "visible");
                         $countryParent.find(".css3-loader").hide();
                     });
@@ -39,7 +39,7 @@
                             $.each(response, function(k, v) {
                                 stateValues += '<option value="'+k+'">'+v+'</option>';
                             });
-                            countryState.html(stateValues);
+                            countryState.html(stateValues).trigger("chosen:updated");
                         });
                     } else {
                         if (countryState.parent("li").is(":visible")) {
