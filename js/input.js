@@ -51,7 +51,7 @@
         }
 
         function get_related_cities(countryID, callback) {
-            var storageKey      = "cities"+countryId;
+            var storageKey      = "cities"+countryID;
             var cities                 = getLocalStorage(storageKey);
 
             if (cities !== null)
