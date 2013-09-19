@@ -24,9 +24,12 @@ class acf_field_country extends acf_field
         $this->category = __("Basic",'acf'); // Basic, Content, Choice, etc
 
         $this->defaults = array(
-            "country_name" => 0,
-            "country_city"     => 0,
-            "country_state"  => "0",
+            "country_name" => '',
+            "city_name"    => '',
+            "state_name"   => 0,
+            "country_id"   => 0,
+            "city_id"      => 0,
+            "state_id"     => '',
         );
 
 
@@ -48,7 +51,7 @@ class acf_field_country extends acf_field
     *  create_options()
     *
     *  Create extra options for your field. This is rendered when editing a field.
-    *  The value of $field['name'] can be used (like bellow) to save extra data to the $field
+    *  The value of $field['name'] can be used (like below) to save extra data to the $field
     *
     *  @type    action
     *  @since   3.6
@@ -59,11 +62,118 @@ class acf_field_country extends acf_field
 
     function create_options($field)
     {
-        $field = array_merge($this->defaults, $field);
+        $key = $field['name'];
         ?>
 
         <?php
 
+    }
+
+    /**
+     * Get Countries
+     *
+     * Get all countries from the database
+     *
+     */
+    function _acf_get_countries()
+    {
+        global $wpdb;
+        $countries_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."countries ORDER BY country ASC");
+
+        $countries = array();
+
+        foreach ($countries_db AS $country)
+        {
+            if (trim($country->country) == '') continue;
+            $countries[$country->id] = $country->country;
+        }
+
+        return $countries;
+    }
+
+    /**
+     * Get Country
+     *
+     * Get a particular country from the database
+     *
+     */
+    function _acf_get_country($country_id)
+    {
+        global $wpdb;
+        $country = $wpdb->get_row("SELECT * FROM ".$wpdb->prefix."countries WHERE id = '".$country_id."'");
+
+        if ($country)
+        {
+            return $country->country;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    /**
+     * Get Cities
+     *
+     * Get all cities for a particular country
+     *
+     */
+    function _acf_get_cities($country_id)
+    {
+        global $wpdb;
+        $cities_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."cities WHERE country='".$country_id."' ORDER BY city ASC");
+
+        $cities = array(); 
+
+        foreach ($cities_db AS $city)
+        {
+            if (trim($city->city) == '') continue;
+            $cities[$city->id] = $city->city;
+        }
+
+        return $cities;
+    }
+
+    /**
+     * Get City
+     *
+     * Get a particular city based on its ID
+     *
+     */
+    function _acf_get_city($city_id)
+    {
+        global $wpdb;
+        $city = $wpdb->get_row("SELECT * FROM ".$wpdb->prefix."cities WHERE id = '".$city_id."'");
+
+        if ($city)
+        {
+            return $city->city;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    /**
+     * Get State
+     *
+     * Get a particular state based on its ID
+     *
+     */
+    function _acf_get_state($state_id)
+    {
+        global $wpdb;
+        $state = $wpdb->get_row("SELECT * FROM ".$wpdb->prefix."states WHERE id = '".$state_id."'");
+
+        if ($state)
+        {
+            return $state->state;
+        }
+        else
+        {
+            return false;
+        }
     }
 
 
@@ -81,37 +191,21 @@ class acf_field_country extends acf_field
 
     function create_field( $field )
     {
-        $field = array_merge($this->defaults, $field);
+        $field['value'] = isset($field['value']) ? $field['value'] : '';
 
-        $key             = $field['name'];
-        $country_id = $field['value']['country_name'];
-        $city_id        = $field['value']['country_city'];
-        $state_id      = (isset($field['value']['country_state'])) ? $field['value']['country_state'] : $field['country_state'];
+        $country_id = (isset($field['value']['country_id'])) ? $field['value']['country_id'] : 0;
+        $city_id    = (isset($field['value']['city_id'])) ? $field['value']['city_id'] : 0;
+        $state_id   = (isset($field['value']['state_id'])) ? $field['value']['state_id'] : 0;
+
+        $key        = $field['name'];
 
         global $wpdb;
 
-        $countries_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."countries ORDER BY country ASC");
-        $cities_db        = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."cities WHERE  country='".$country_id."' ORDER BY city ASC");
-
-        $countries        = array();
-        $cities               = array();
+        $countries  = $this->_acf_get_countries();
+        $cities     = $this->_acf_get_cities($country_id);
 
         // Only applies when United States is selected as a country
-        $states             = array();
-
-        $cities[0] = "";
-
-        foreach ($countries_db AS $country)
-        {
-            if (trim($country->country) == '') continue;
-            $countries[$country->id] = $country->country;
-        }
-
-        foreach ($cities_db AS $city)
-        {
-            if (trim($city->city) == '') continue;
-            $cities[$city->id] = $city->city;
-        }
+        $states     = array();
 
         // If we have selected USA
         if ($country_id == 446)
@@ -127,50 +221,51 @@ class acf_field_country extends acf_field
         ?>
 
             <ul class="country-selector-list">
-                <li id="field-<?php echo $key; ?>[country_name]">
+                <li id="field-<?php echo $key; ?>[country_id]">
                     <div class="field-inner">
                         <strong><?php _e("Select your country", 'acf'); ?></strong><br />
 
                         <?php
 
-                        $country_field = $field['name'] . '[country_name]';
+                        $country_field = $field['name'] . '[country_id]';
                         do_action('acf/create_field', array(
-                            'type'            =>  'select',
-                            'name'          =>  $country_field,
-                            'value'           =>  $country_id,
-                            'choices'       =>  $countries,
+                            'type'        =>  'select',
+                            'name'        =>  $country_field,
+                            'value'       =>  $country_id,
+                            'choices'     =>  $countries,
                             'placeholder' => 'Choose a country...'
                         ));
 
                         ?>
+
                     </div>
                 </li>
-                <li id="field-<?php echo $key; ?>[country_city]">
+                <li id="field-<?php echo $key; ?>[city_id]">
                     <div class="css3-loader" style="display:none;"><div class="css3-spinner"></div></div>
                     <div class="field-inner">
                         <strong><?php _e("Select your city", 'acf'); ?></strong><br />
 
                         <?php
 
-                        $city_field = $field['name'] . '[country_city]';
+                        $city_field = $field['name'] . '[city_id]';
                         do_action('acf/create_field', array(
-                            'type'      =>  'select',
+                            'type'    =>  'select',
                             'name'    =>  $city_field,
-                            'value'     =>  $city_id,
+                            'value'   =>  $city_id,
                             'choices' =>  $cities,
                         ));
 
                         ?>
                     </div>
                 </li>
-                <li id="field-<?php echo $key; ?>[country_state]" <?php if (empty($states)): ?>style="display:none;"<?php endif; ?>>
+                <li id="field-<?php echo $key; ?>[state_id]" <?php if (empty($states)): ?>style="display:none;"<?php endif; ?>>
                     <div class="css3-loader" style="display:none;"><div class="css3-spinner"></div></div>
                     <div class="field-inner">
                         <strong><?php _e("Select your state", 'acf'); ?></strong><br />
 
                         <?php
 
-                        $state_field = $field['name'] . '[country_state]';
+                        $state_field = $field['name'] . '[state_id]';
                         do_action('acf/create_field', array(
                             'type'      =>  'select',
                             'name'    =>  $state_field,
@@ -270,7 +365,10 @@ class acf_field_country extends acf_field
 
     function update_value($value, $post_id, $field)
     {
-        // Note: This function can be removed if not used
+        $value['country_name'] = $this->_acf_get_country($value['country_id']);
+        $value['city_name']    = $this->_acf_get_city($value['city_id']);
+        $value['state_name']   = (isset($value['state_id']) && $value['state_id'] !== 0) ? $this->_acf_get_state($value['state_id']) : '';
+
         return $value;
     }
 
@@ -321,12 +419,13 @@ class acf_field_country extends acf_field
 
     function format_value_for_api($value, $post_id, $field)
     {
-        $field = array_merge($this->defaults, $field);
+        $old_values = $value;
+        $value      = array();
 
-        // perhaps use $field['preview_size'] to alter the $value?
+        $value['country_name'] = $this->_acf_get_country($old_values['country_id']);
+        $value['city_name']    = $this->_acf_get_city($old_values['city_id']);
+        $value['state_name']   = (isset($old_values['state_id']) && $old_values['state_id'] !== 0) ? $this->_acf_get_state($old_values['state_id']) : '';
 
-
-        // Note: This function can be removed if not used
         return $value;
     }
 
@@ -347,6 +446,7 @@ class acf_field_country extends acf_field
 
     function load_field($field)
     {
+
         // Note: This function can be removed if not used
         return $field;
     }
@@ -369,7 +469,6 @@ class acf_field_country extends acf_field
 
     function update_field($field, $post_id)
     {
-        // Note: This function can be removed if not used
         return $field;
     }
 

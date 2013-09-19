@@ -1,7 +1,7 @@
 ;(function($, undefined) {
     $(function() {
         var originalCountry = 0;
-        var countrySelect   = $('select[name*="country_name"]');
+        var countrySelect   = $('select[name*="country_id"]');
 
         $(".country-selector-list select").chosen({
             disable_search_threshold: 10
@@ -11,8 +11,8 @@
             countrySelect.change(function() {
                 var $this              = $(this);
                 var $list               = $this.parents('ul');
-                var countryCity   = $list.find('select[name*="country_city"]');
-                var countryState = $list.find('select[name*="country_state"]');
+                var countryCity   = $list.find('select[name*="city_id"]');
+                var countryState = $list.find('select[name*="state_id"]');
 
                 if ($this.val() !== originalCountry) {
                     originalCountry = $this.val();
@@ -54,7 +54,7 @@
 
         function get_related_cities(countryID, callback) {
             var storageKey      = "cities"+countryID;
-            var cities                 = getLocalStorage(storageKey);
+            var cities          = getLocalStorage(storageKey);
 
             if (cities !== null)
             {
