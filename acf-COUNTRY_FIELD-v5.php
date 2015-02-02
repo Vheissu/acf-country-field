@@ -54,7 +54,7 @@ class acf_field_COUNTRY_FIELD extends acf_field
         // If we have selected USA
         if ($country_id === 446)
         {
-            $states_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."states ORDER BY state ASC");
+            $states_db = $wpdb->get_results("SELECT DISTINCT * FROM ".$wpdb->prefix."states ORDER BY state ASC");
 
             foreach ($states_db AS $state)
             {
@@ -76,7 +76,7 @@ class acf_field_COUNTRY_FIELD extends acf_field
                         <select name="<?= $country_field; ?>">
                             <option value="">Choose a country...</option>
                             <?php foreach ($countries AS $ID => $country): ?>
-                                <option value="<?= $ID; ?>"><?= $country; ?></option>
+                                <option value="<?= $ID; ?>"<?php if ($country_id === $ID): ?>selected<?php endif; ?>><?= $country; ?></option>
                             <?php endforeach; ?>
                         </select>
 
@@ -168,7 +168,7 @@ class acf_field_COUNTRY_FIELD extends acf_field
     public function _acf_get_countries()
     {
         global $wpdb;
-        $countries_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."countries ORDER BY country ASC");
+        $countries_db = $wpdb->get_results("SELECT DISTINCT * FROM ".$wpdb->prefix."countries ORDER BY country ASC");
 
         $countries = array();
 
@@ -190,7 +190,7 @@ class acf_field_COUNTRY_FIELD extends acf_field
     public function _acf_get_country($country_id)
     {
         global $wpdb;
-        $country = $wpdb->get_row("SELECT * FROM ".$wpdb->prefix."countries WHERE id = '".$country_id."'");
+        $country = $wpdb->get_row("SELECT DISTINCT * FROM ".$wpdb->prefix."countries WHERE id = '".$country_id."'");
 
         if ($country)
         {
@@ -211,7 +211,7 @@ class acf_field_COUNTRY_FIELD extends acf_field
     public function _acf_get_cities($country_id)
     {
         global $wpdb;
-        $cities_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."cities WHERE country='".$country_id."' ORDER BY city ASC");
+        $cities_db = $wpdb->get_results("SELECT DISTINCT * FROM ".$wpdb->prefix."cities WHERE country='".$country_id."' ORDER BY city ASC");
 
         $cities = array(); 
 
@@ -233,7 +233,7 @@ class acf_field_COUNTRY_FIELD extends acf_field
     public function _acf_get_city($city_id)
     {
         global $wpdb;
-        $city = $wpdb->get_row("SELECT * FROM ".$wpdb->prefix."cities WHERE id = '".$city_id."'");
+        $city = $wpdb->get_row("SELECT DISTINCT * FROM ".$wpdb->prefix."cities WHERE id = '".$city_id."'");
 
         if ($city)
         {
@@ -254,7 +254,7 @@ class acf_field_COUNTRY_FIELD extends acf_field
     public function _acf_get_state($state_id)
     {
         global $wpdb;
-        $state = $wpdb->get_row("SELECT * FROM ".$wpdb->prefix."states WHERE id = '".$state_id."'");
+        $state = $wpdb->get_row("SELECT DISTINCT * FROM ".$wpdb->prefix."states WHERE id = '".$state_id."'");
 
         if ($state) {
             return $state->state;
@@ -271,7 +271,7 @@ class acf_field_COUNTRY_FIELD extends acf_field
 
         $country_id = (int) trim($_POST['countryId']);
 
-        $cities_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."cities WHERE country='".$country_id."' ORDER BY city ASC");
+        $cities_db = $wpdb->get_results("SELECT DISTINCT * FROM ".$wpdb->prefix."cities WHERE country='".$country_id."' ORDER BY city ASC");
         $cities = array();
 
         if ($cities_db)
@@ -292,7 +292,7 @@ class acf_field_COUNTRY_FIELD extends acf_field
     {
         global $wpdb;
 
-        $states_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."states ORDER BY state ASC");
+        $states_db = $wpdb->get_results("SELECT DISTINCT * FROM ".$wpdb->prefix."states ORDER BY state ASC");
         $states = array();
 
         if ($states_db)
