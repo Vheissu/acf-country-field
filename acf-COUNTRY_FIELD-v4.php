@@ -19,9 +19,6 @@ class acf_field_COUNTRY_FIELD extends acf_field {
             "state_id"     => '',
         );
 
-        register_activation_hook( __FILE__, array($this, 'populate_db') );
-        register_deactivation_hook( __FILE__, array($this, 'depopulate_db') );
-
         parent::__construct();
 
         $this->settings = array(
@@ -323,26 +320,6 @@ class acf_field_COUNTRY_FIELD extends acf_field {
         echo json_encode($states);
 
         die();
-    }
-
-    public function populate_db()
-    {
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-
-        ob_start();
-        require_once "lib/install-data.php";
-        $sql = ob_get_clean();
-        dbDelta( $sql );
-    }
-
-    public function depopulate_db()
-    {
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-
-        ob_start();
-        require_once "lib/drop-tables.php";
-        $sql = ob_get_clean();
-        dbDelta( $sql );
     }
 
 }
