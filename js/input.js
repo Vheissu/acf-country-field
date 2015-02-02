@@ -9,9 +9,9 @@
 
         if (countrySelect.length) {
             countrySelect.change(function() {
-                var $this              = $(this);
-                var $list               = $this.parents('ul');
-                var countryCity   = $list.find('select[name*="city_id"]');
+                var $this = $(this);
+                var $list = $this.parents('ul');
+                var countryCity = $list.find('select[name*="city_id"]');
                 var countryState = $list.find('select[name*="state_id"]');
 
                 if ($this.val() !== originalCountry) {
@@ -33,6 +33,7 @@
                         $countryParent.find(".css3-loader").hide();
                     });
 
+                    // If the country is the USA
                     if ($this.val() == 446) {
                         var stateValues = '';
 
@@ -56,21 +57,18 @@
             var storageKey      = "cities"+countryID;
             var cities          = getLocalStorage(storageKey);
 
-            if (cities !== null)
-            {
+            if (cities !== null) {
                 callback(JSON.parse(cities));
-            }
-            else
-            {
+            } else {
                 $.ajax({
-                        url              :   acfCountry.ajaxurl,
-                        type           :   'post',
-                        dataType  :   'json',
-                        data           :   {
-                            action      :   'get_country_cities',
-                            countryId : countryID
+                        url: acfCountry.ajaxurl,
+                        type: 'post',
+                        dataType: 'json',
+                        data: {
+                            action: 'get_country_cities',
+                            countryId: countryID
                         },
-                        success    : function(response) {
+                        success: function(response) {
                             callback(response);
                             setLocalStorage(storageKey, JSON.stringify(response));
                         }
@@ -79,7 +77,9 @@
         }
 
         function setLocalStorage(key, value, expires) {
-            if (expires==undefined || expires=='null') { var expires = 18000; } // default: 5h
+            if (expires === undefined || expires === 'null') { 
+                var expires = 18000; 
+            } // default: 5h
 
             var date = new Date();
             var schedule = Math.round((date.setSeconds(date.getSeconds()+expires))/1000);
@@ -94,7 +94,10 @@
 
             // Get Schedule
             var stored_time = localStorage.getItem(key+'_time');
-            if (stored_time==undefined || stored_time=='null') { var stored_time = 0; }
+
+            if (stored_time === undefined || stored_time === 'null') { 
+                var stored_time = 0; 
+            }
 
             if (stored_time < current) {
                 clearLocalStorage(key);
@@ -112,19 +115,17 @@
 
         function get_us_states(callback) {
             $.ajax({
-                url              :   acfCountry.ajaxurl,
-                type           :   'post',
-                dataType  :   'json',
-                data           :   {
-                    action      :   'get_us_states'
+                url: acfCountry.ajaxurl,
+                type: 'post',
+                dataType: 'json',
+                data: {
+                    action: 'get_us_states'
                 },
-                success    : function(response) {
+                success: function(response) {
                     callback(response);
                 }
             });
         }
-
-
 
     });
 })(jQuery);
