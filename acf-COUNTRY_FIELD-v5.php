@@ -85,37 +85,27 @@ class acf_field_COUNTRY_FIELD extends acf_field
                 <li id="field-<?php echo $key; ?>[city_id]">
                     <div class="css3-loader" style="display:none;"><div class="css3-spinner"></div></div>
                     <div class="field-inner">
+                        <?php $city_field = $field['name'] . '[city_id]'; ?>
                         <strong><?php _e("Select your city", 'acf'); ?></strong><br />
-
-                        <?php
-
-                        $city_field = $field['name'] . '[city_id]';
-                        do_action('acf/create_field', array(
-                            'type'    =>  'select',
-                            'name'    =>  $city_field,
-                            'value'   =>  $city_id,
-                            'choices' =>  $cities,
-                        ));
-
-                        ?>
+                        <select name="<?= $city_field; ?>">
+                            <option value="">Select your city...</option>
+                            <?php foreach ($cities AS $ID => $city): ?>
+                                <option value="<?= $ID; ?>"<?php if ($city_id === $ID): ?>selected<?php endif; ?>><?= $city; ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </li>
                 <li id="field-<?php echo $key; ?>[state_id]" <?php if (empty($states)): ?>style="display:none;"<?php endif; ?>>
                     <div class="css3-loader" style="display:none;"><div class="css3-spinner"></div></div>
                     <div class="field-inner">
+                        <?php $state_field = $field['name'] . '[state_id]'; ?>
                         <strong><?php _e("Select your state", 'acf'); ?></strong><br />
-
-                        <?php
-
-                        $state_field = $field['name'] . '[state_id]';
-                        do_action('acf/create_field', array(
-                            'type'      =>  'select',
-                            'name'    =>  $state_field,
-                            'value'     =>  $state_id,
-                            'choices' =>  $states,
-                        ));
-
-                        ?>
+                        <select name="<?= $state_field; ?>">
+                            <option value="">Select your state...</option>
+                            <?php foreach ($states AS $ID => $state): ?>
+                                <option value="<?= $ID; ?>"<?php if ($state_id === $ID): ?>selected<?php endif; ?>><?= $state; ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </li>
             </ul>
