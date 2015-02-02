@@ -1,7 +1,7 @@
 <?php
 
-class acf_field_COUNTRY_FIELD extends acf_field {
-
+class acf_field_COUNTRY_FIELD extends acf_field 
+{
     var $settings, $defaults;
 
     public function __construct()
@@ -19,28 +19,25 @@ class acf_field_COUNTRY_FIELD extends acf_field {
             "state_id"     => '',
         );
 
-        register_activation_hook( __FILE__, array($this, 'populate_db') );
-        register_deactivation_hook( __FILE__, array($this, 'depopulate_db') );
-
         parent::__construct();
 
         $this->settings = array(
             'path' => apply_filters('acf/helpers/get_path', __FILE__),
-            'dir' => apply_filters('acf/helpers/get_dir', __FILE__),
+            'dir' => plugin_dir_url( __FILE__ ),
             'version' => '1.0.1'
         );
     }
 
-    function create_options($field)
+    public function create_options($field)
     {
         $key = $field['name'];
     }
 
-    function render_field( $field )
+    public function render_field( $field )
     {
         $field['value'] = isset($field['value']) ? $field['value'] : '';
 
-        $country_id = (isset($field['value']['country_id'])) ? $field['value']['country_id'] : 0;
+        $country_id = (isset($field['value']['country_id'])) ? $field['value']['country_id'] : 446;
         $city_id    = (isset($field['value']['city_id'])) ? $field['value']['city_id'] : 0;
         $state_id   = (isset($field['value']['state_id'])) ? $field['value']['state_id'] : 0;
 
@@ -52,38 +49,36 @@ class acf_field_COUNTRY_FIELD extends acf_field {
         $cities     = $this->_acf_get_cities($country_id);
 
         // Only applies when United States is selected as a country
-        $states     = array();
+        $states = array();
 
         // If we have selected USA
-        if ($country_id == 446)
+        if ($country_id === 446)
         {
-            $states_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."states  ORDER BY state ASC");
+            $states_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."states ORDER BY state ASC");
 
             foreach ($states_db AS $state)
             {
-                if (trim($state->state) == '') continue;
+                if (trim($state->state) === '') 
+                {
+                    continue;
+                }
+
                 $states[$state->id] = $state->state;
             }
         }
         ?>
 
+            <?php $country_field = $field['name'] . '[country_id]'; ?>
             <ul class="country-selector-list">
                 <li id="field-<?php echo $key; ?>[country_id]">
                     <div class="field-inner">
                         <strong><?php _e("Select your country", 'acf'); ?></strong><br />
-
-                        <?php
-
-                        $country_field = $field['name'] . '[country_id]';
-                        do_action('acf/create_field', array(
-                            'type'        =>  'select',
-                            'name'        =>  $country_field,
-                            'value'       =>  $country_id,
-                            'choices'     =>  $countries,
-                            'placeholder' => 'Choose a country...'
-                        ));
-
-                        ?>
+                        <select name="<?= $country_field; ?>">
+                            <option value="">Choose a country...</option>
+                            <?php foreach ($countries AS $ID => $country): ?>
+                                <option value="<?= $ID; ?>"><?= $country; ?></option>
+                            <?php endforeach; ?>
+                        </select>
 
                     </div>
                 </li>
@@ -128,7 +123,7 @@ class acf_field_COUNTRY_FIELD extends acf_field {
         <?php
     }
 
-    function input_admin_enqueue_scripts()
+    public function input_admin_enqueue_scripts()
     {
         wp_register_script('acf-input-country', $this->settings['dir'] . 'js/input.js', array('acf-input'), $this->settings['version']);
         wp_register_script('acf-input-chosen', $this->settings['dir'] . 'js/chosen.jquery.min.js', array('jquery'), $this->settings['version']);
@@ -153,7 +148,7 @@ class acf_field_COUNTRY_FIELD extends acf_field {
         ));
     }
 
-    function update_value($value, $post_id, $field)
+    public function update_value($value, $post_id, $field)
     {
         $value['country_name'] = $this->_acf_get_country($value['country_id']);
         $value['city_name']    = $this->_acf_get_city($value['city_id']);
@@ -162,7 +157,7 @@ class acf_field_COUNTRY_FIELD extends acf_field {
         return $value;
     }
 
-    function format_value($value, $post_id, $field)
+    public function format_value($value, $post_id, $field)
     {
         $old_values = $value;
         $value      = array();
@@ -180,7 +175,7 @@ class acf_field_COUNTRY_FIELD extends acf_field {
      * Get all countries from the database
      *
      */
-    function _acf_get_countries()
+    public function _acf_get_countries()
     {
         global $wpdb;
         $countries_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."countries ORDER BY country ASC");
@@ -202,7 +197,7 @@ class acf_field_COUNTRY_FIELD extends acf_field {
      * Get a particular country from the database
      *
      */
-    function _acf_get_country($country_id)
+    public function _acf_get_country($country_id)
     {
         global $wpdb;
         $country = $wpdb->get_row("SELECT * FROM ".$wpdb->prefix."countries WHERE id = '".$country_id."'");
@@ -223,7 +218,7 @@ class acf_field_COUNTRY_FIELD extends acf_field {
      * Get all cities for a particular country
      *
      */
-    function _acf_get_cities($country_id)
+    public function _acf_get_cities($country_id)
     {
         global $wpdb;
         $cities_db = $wpdb->get_results("SELECT * FROM ".$wpdb->prefix."cities WHERE country='".$country_id."' ORDER BY city ASC");
@@ -245,7 +240,7 @@ class acf_field_COUNTRY_FIELD extends acf_field {
      * Get a particular city based on its ID
      *
      */
-    function _acf_get_city($city_id)
+    public function _acf_get_city($city_id)
     {
         global $wpdb;
         $city = $wpdb->get_row("SELECT * FROM ".$wpdb->prefix."cities WHERE id = '".$city_id."'");
@@ -266,20 +261,18 @@ class acf_field_COUNTRY_FIELD extends acf_field {
      * Get a particular state based on its ID
      *
      */
-    function _acf_get_state($state_id)
+    public function _acf_get_state($state_id)
     {
         global $wpdb;
         $state = $wpdb->get_row("SELECT * FROM ".$wpdb->prefix."states WHERE id = '".$state_id."'");
 
-        if ($state)
-        {
+        if ($state) {
             return $state->state;
-        }
-        else
-        {
+        } else {
             return false;
         }
     }
+}
 
     add_action('wp_ajax_get_country_cities', 'get_country_cities');
     function get_country_cities()
@@ -325,27 +318,5 @@ class acf_field_COUNTRY_FIELD extends acf_field {
         die();
     }
 
-    public function populate_db()
-    {
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-
-        ob_start();
-        require_once "lib/install-data.php";
-        $sql = ob_get_clean();
-        dbDelta( $sql );
-    }
-
-    public function depopulate_db()
-    {
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-
-        ob_start();
-        require_once "lib/drop-tables.php";
-        $sql = ob_get_clean();
-        dbDelta( $sql );
-    }
-
-}
-
-// Create our v4 field
-new acf_field_COUNTRY_FIELD();
+    // Create our v4 field
+    new acf_field_COUNTRY_FIELD();
