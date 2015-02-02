@@ -1,7 +1,10 @@
-Country Field for Advanced Custom Fields v4+
+Country Field for Advanced Custom Fields v4
 =================
 
-A country, city and state field for Advanced Custom Fields v4+
+A country, city and state field for Advanced Custom Fields v4.
+
+## A note on V5/Pro support
+I am currently working on a newer version which will work with ACF v5. Please be patient, it will be out shortly.
 
 ## Installation
 1. Extract the plugin contents into your wp-content/plugins directory
