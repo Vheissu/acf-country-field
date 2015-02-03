@@ -1,10 +1,7 @@
-Country Field for Advanced Custom Fields v4
+Country Field for Advanced Custom Fields v4 and ACF Pro (v5)
 =================
 
-A country, city and state field for Advanced Custom Fields v4.
-
-## A note on V5/Pro support
-I am currently working on a newer version which will work with ACF v5. Please be patient, it will be out shortly.
+A country, city and state field for Advanced Custom Fields v4 and ACF Pro (v5).
 
 ## Installation
 1. Extract the plugin contents into your wp-content/plugins directory
@@ -15,4 +12,5 @@ I am currently working on a newer version which will work with ACF v5. Please be
 ## About
 This plugin allows you to have a country, city and if you select US as your country in the backend you get a states dropdown as well. Everything is autopopulating and concise, allowing for you to use it for numerous purposes including contact forms, order forms, registration forms and for creating your own classifieds websites.
 
-The plugin in its current state works, but it might be buggy and missing some features as it was created in about an hour or so.
+## Bugs/Issues
+The plugin in its current state works, but you might run into an issue. If you do, feel free to fork and submit a pull request or create an issue and I will do my best to fix it.
