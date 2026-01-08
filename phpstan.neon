@@ -1,0 +1,35 @@
+parameters:
+    level: 6
+    paths:
+        - src
+    excludePaths:
+        - vendor
+    ignoreErrors:
+        # WordPress global $wpdb
+        - '#Variable \$wpdb might not be defined#'
+        # ACF base class
+        - '#Class acf_field not found#'
+        - '#Call to undefined method acf_field::#'
+        # WordPress functions
+        - '#Function wp_\w+ not found#'
+        - '#Function get_option not found#'
+        - '#Function update_option not found#'
+        - '#Function delete_option not found#'
+        - '#Function add_action not found#'
+        - '#Function add_filter not found#'
+        - '#Function apply_filters not found#'
+        - '#Function do_action not found#'
+        - '#Function esc_\w+ not found#'
+        - '#Function __\( not found#'
+        - '#Function _e not found#'
+        - '#Function selected not found#'
+        - '#Function absint not found#'
+        - '#Function dbDelta not found#'
+        - '#Function current_user_can not found#'
+        - '#Function check_ajax_referer not found#'
+        - '#Function load_plugin_textdomain not found#'
+        - '#Function plugin_\w+ not found#'
+        - '#Function admin_url not found#'
+        - '#Function register_\w+_hook not found#'
+        - '#Function acf_render_field_setting not found#'
+    tmpDir: .phpstan.cache

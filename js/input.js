@@ -1,131 +1,327 @@
-;(function($, undefined) {
-    $(function() {
-        var originalCountry = 0;
-        var countrySelect   = $('select[name*="country_id"]');
+/**
+ * ACF Country Field - Input JavaScript
+ *
+ * Handles country/city/state selection with AJAX loading.
+ * Includes caching, nonce verification, and ACF integration.
+ *
+ * @package AcfCountryField
+ */
 
-        $(".country-selector-list select").chosen({
-            disable_search_threshold: 10
-        });
+;(function($, acf, undefined) {
+    'use strict';
 
-        if (countrySelect.length) {
-            countrySelect.change(function() {
-                var $this = $(this);
-                var $list = $this.parents('ul');
-                var countryCity = $list.find('select[name*="city_id"]');
-                var countryState = $list.find('select[name*="state_id"]');
+    // Check if ACF is available
+    if (typeof acf === 'undefined') {
+        console.warn('ACF Country Field: ACF is not loaded');
+        return;
+    }
 
-                if ($this.val() !== originalCountry) {
-                    originalCountry = $this.val();
+    // Get configuration from localized script
+    var config = window.acfCountryField || {
+        ajaxUrl: window.ajaxurl || '/wp-admin/admin-ajax.php',
+        nonce: '',
+        nonceKey: 'acf_country_nonce',
+        usaCountryId: 446,
+        i18n: {
+            chooseCountry: 'Choose a country...',
+            selectCity: 'Select your city...',
+            selectState: 'Select your state...'
+        }
+    };
 
-                    var optionsValues   = '';
-                    var $countryParent  = countryCity.parents("li");
+    // Legacy support for old config
+    if (window.acfCountry) {
+        config.ajaxUrl = window.acfCountry.ajaxurl || config.ajaxUrl;
+    }
 
-                    $countryParent.find(".field-inner").css("visibility", "hidden");
-                    $countryParent.find(".css3-loader").show();
+    /**
+     * LocalStorage cache with TTL support.
+     */
+    var Cache = {
+        TTL: 18000, // 5 hours in seconds
 
-                    get_related_cities($this.val(), function(response) {
-                        countryCity.empty();
-                        $.each(response, function(k, v) {
-                            optionsValues += '<option value="'+k+'">'+v+'</option>';
-                        });
-                        countryCity.html(optionsValues).trigger("chosen:updated");
-                        $countryParent.find(".field-inner").css("visibility", "visible");
-                        $countryParent.find(".css3-loader").hide();
-                    });
+        set: function(key, value, ttl) {
+            ttl = ttl || this.TTL;
 
-                    // If the country is the USA
-                    if ($this.val() == 446) {
-                        var stateValues = '';
+            try {
+                var now = Math.round(Date.now() / 1000);
+                localStorage.setItem(key, JSON.stringify(value));
+                localStorage.setItem(key + '_expires', String(now + ttl));
+            } catch (e) {
+                // localStorage not available or quota exceeded
+                console.warn('ACF Country Field: Cache write failed', e);
+            }
+        },
 
-                        get_us_states(function(response) {
-                            countryState.empty().parent("li").show();
-                            $.each(response, function(k, v) {
-                                stateValues += '<option value="'+k+'">'+v+'</option>';
-                            });
-                            countryState.html(stateValues).trigger("chosen:updated");
-                        });
+        get: function(key) {
+            try {
+                var expires = parseInt(localStorage.getItem(key + '_expires'), 10);
+                var now = Math.round(Date.now() / 1000);
+
+                if (!expires || expires < now) {
+                    this.remove(key);
+                    return null;
+                }
+
+                var value = localStorage.getItem(key);
+                return value ? JSON.parse(value) : null;
+            } catch (e) {
+                console.warn('ACF Country Field: Cache read failed', e);
+                return null;
+            }
+        },
+
+        remove: function(key) {
+            try {
+                localStorage.removeItem(key);
+                localStorage.removeItem(key + '_expires');
+            } catch (e) {
+                // Ignore errors
+            }
+        }
+    };
+
+    /**
+     * AJAX helper with nonce support.
+     */
+    var Ajax = {
+        request: function(action, data, callback) {
+            var requestData = $.extend({}, data, {
+                action: action
+            });
+
+            // Add nonce for secure endpoints
+            if (config.nonce && config.nonceKey) {
+                requestData[config.nonceKey] = config.nonce;
+            }
+
+            $.ajax({
+                url: config.ajaxUrl,
+                type: 'POST',
+                dataType: 'json',
+                data: requestData,
+                success: function(response) {
+                    // Handle both old format (plain object) and new format (success wrapper)
+                    if (response && response.success !== undefined) {
+                        callback(response.data || {});
                     } else {
-                        if (countryState.parent("li").is(":visible")) {
-                            countryState.empty().parent("li").hide();
-                        }
+                        callback(response || {});
                     }
+                },
+                error: function(xhr, status, error) {
+                    console.error('ACF Country Field: AJAX error', status, error);
+                    callback({});
                 }
             });
         }
+    };
 
-        function get_related_cities(countryID, callback) {
-            var storageKey      = "cities"+countryID;
-            var cities          = getLocalStorage(storageKey);
+    /**
+     * Get cities for a country (with caching).
+     */
+    function getCities(countryId, callback) {
+        var cacheKey = 'acf_cities_' + countryId;
+        var cached = Cache.get(cacheKey);
 
-            if (cities !== null) {
-                callback(JSON.parse(cities));
+        if (cached) {
+            callback(cached);
+            return;
+        }
+
+        // Try new action first, fall back to legacy
+        Ajax.request('acf_get_country_cities', { country_id: countryId }, function(response) {
+            if (response && Object.keys(response).length > 0) {
+                Cache.set(cacheKey, response);
+                callback(response);
             } else {
-                $.ajax({
-                        url: acfCountry.ajaxurl,
-                        type: 'post',
-                        dataType: 'json',
-                        data: {
-                            action: 'get_country_cities',
-                            countryId: countryID
-                        },
-                        success: function(response) {
-                            callback(response);
-                            setLocalStorage(storageKey, JSON.stringify(response));
-                        }
+                // Fallback to legacy action
+                Ajax.request('get_country_cities', { countryId: countryId }, function(legacyResponse) {
+                    if (legacyResponse && Object.keys(legacyResponse).length > 0) {
+                        Cache.set(cacheKey, legacyResponse);
+                    }
+                    callback(legacyResponse || {});
                 });
             }
+        });
+    }
+
+    /**
+     * Get US states (with caching).
+     */
+    function getStates(callback) {
+        var cacheKey = 'acf_us_states';
+        var cached = Cache.get(cacheKey);
+
+        if (cached) {
+            callback(cached);
+            return;
         }
 
-        function setLocalStorage(key, value, expires) {
-            if (expires === undefined || expires === 'null') { 
-                var expires = 18000; 
-            } // default: 5h
-
-            var date = new Date();
-            var schedule = Math.round((date.setSeconds(date.getSeconds()+expires))/1000);
-
-            localStorage.setItem(key, value);
-            localStorage.setItem(key+'_time', schedule);
-        }
-
-        function getLocalStorage(key) {
-            var date     = new Date();
-            var current = Math.round(+date/1000);
-
-            // Get Schedule
-            var stored_time = localStorage.getItem(key+'_time');
-
-            if (stored_time === undefined || stored_time === 'null') { 
-                var stored_time = 0; 
-            }
-
-            if (stored_time < current) {
-                clearLocalStorage(key);
-                return null;
-
+        // Try new action first, fall back to legacy
+        Ajax.request('acf_get_us_states', {}, function(response) {
+            if (response && Object.keys(response).length > 0) {
+                Cache.set(cacheKey, response);
+                callback(response);
             } else {
-                return localStorage.getItem(key);
+                // Fallback to legacy action
+                Ajax.request('get_us_states', {}, function(legacyResponse) {
+                    if (legacyResponse && Object.keys(legacyResponse).length > 0) {
+                        Cache.set(cacheKey, legacyResponse);
+                    }
+                    callback(legacyResponse || {});
+                });
             }
-        }
+        });
+    }
 
-        function clearLocalStorage(key) {
-            localStorage.removeItem(key);
-            localStorage.removeItem(key+'_time');
-        }
+    /**
+     * Build options HTML from data object.
+     */
+    function buildOptions(data, placeholder) {
+        var html = '<option value="">' + (placeholder || '') + '</option>';
 
-        function get_us_states(callback) {
-            $.ajax({
-                url: acfCountry.ajaxurl,
-                type: 'post',
-                dataType: 'json',
-                data: {
-                    action: 'get_us_states'
-                },
-                success: function(response) {
-                    callback(response);
+        $.each(data, function(id, name) {
+            html += '<option value="' + escapeHtml(String(id)) + '">' + escapeHtml(name) + '</option>';
+        });
+
+        return html;
+    }
+
+    /**
+     * Escape HTML entities.
+     */
+    function escapeHtml(text) {
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    /**
+     * Show loading indicator.
+     */
+    function showLoading($container) {
+        $container.find('.acf-field-inner, .field-inner').css('visibility', 'hidden');
+        $container.find('.acf-loading-indicator, .css3-loader').show();
+    }
+
+    /**
+     * Hide loading indicator.
+     */
+    function hideLoading($container) {
+        $container.find('.acf-field-inner, .field-inner').css('visibility', 'visible');
+        $container.find('.acf-loading-indicator, .css3-loader').hide();
+    }
+
+    /**
+     * Initialize Chosen on select elements.
+     */
+    function initChosen($selects) {
+        if ($.fn.chosen) {
+            $selects.each(function() {
+                var $select = $(this);
+                // Only apply Chosen to selects with many options
+                if ($select.find('option').length > 10) {
+                    $select.chosen({
+                        disable_search_threshold: 10,
+                        width: '100%'
+                    });
                 }
             });
         }
+    }
 
+    /**
+     * Initialize a country field wrapper.
+     */
+    function initField($wrapper) {
+        var $countrySelect = $wrapper.find('.acf-country-select, select[name*="country_id"]');
+        var $citySelect = $wrapper.find('.acf-city-select, select[name*="city_id"]');
+        var $stateSelect = $wrapper.find('.acf-state-select, select[name*="state_id"]');
+        var $cityContainer = $citySelect.closest('li');
+        var $stateContainer = $stateSelect.closest('li');
+
+        var usaId = parseInt($wrapper.data('usa-id') || config.usaCountryId, 10);
+
+        // Initialize Chosen on all selects
+        initChosen($wrapper.find('select'));
+
+        // Country change handler
+        $countrySelect.on('change', function() {
+            var countryId = parseInt($(this).val(), 10);
+
+            if (!countryId) {
+                // No country selected - reset city and hide state
+                $citySelect.html(buildOptions({}, config.i18n.selectCity));
+                $stateSelect.html(buildOptions({}, config.i18n.selectState));
+                $stateContainer.hide();
+
+                // Update Chosen
+                $citySelect.trigger('chosen:updated');
+                $stateSelect.trigger('chosen:updated');
+                return;
+            }
+
+            // Show loading on city
+            showLoading($cityContainer);
+
+            // Fetch cities
+            getCities(countryId, function(cities) {
+                $citySelect.html(buildOptions(cities, config.i18n.selectCity));
+                $citySelect.trigger('chosen:updated');
+                hideLoading($cityContainer);
+            });
+
+            // Handle state field for USA
+            if (countryId === usaId) {
+                showLoading($stateContainer);
+                $stateContainer.show();
+
+                getStates(function(states) {
+                    $stateSelect.html(buildOptions(states, config.i18n.selectState));
+                    $stateSelect.trigger('chosen:updated');
+                    hideLoading($stateContainer);
+                });
+            } else {
+                $stateSelect.html(buildOptions({}, config.i18n.selectState));
+                $stateSelect.trigger('chosen:updated');
+                $stateContainer.hide();
+            }
+        });
+    }
+
+    /**
+     * ACF field initialization hook.
+     */
+    if (typeof acf.add_action === 'function') {
+        // ACF 5+ initialization
+        acf.add_action('ready', function($el) {
+            $el.find('.acf-country-field-wrapper, .country-selector-list').each(function() {
+                initField($(this).closest('.acf-country-field-wrapper, ul'));
+            });
+        });
+
+        acf.add_action('append', function($el) {
+            $el.find('.acf-country-field-wrapper, .country-selector-list').each(function() {
+                initField($(this).closest('.acf-country-field-wrapper, ul'));
+            });
+        });
+    }
+
+    // Fallback: Initialize on document ready
+    $(function() {
+        // For fields not caught by ACF hooks
+        $('.acf-country-field-wrapper, .country-selector-list').each(function() {
+            var $wrapper = $(this).closest('.acf-country-field-wrapper, ul');
+            if (!$wrapper.data('acf-country-initialized')) {
+                $wrapper.data('acf-country-initialized', true);
+                initField($wrapper);
+            }
+        });
     });
-})(jQuery);
+
+})(jQuery, window.acf);
