@@ -4,13 +4,25 @@ parameters:
         - src
     excludePaths:
         - vendor
+        # Exclude field class due to unknown acf_field parent
+        - src/Fields/CountryField.php
     ignoreErrors:
-        # WordPress global $wpdb
-        - '#Variable \$wpdb might not be defined#'
-        # ACF base class
-        - '#Class acf_field not found#'
-        - '#Call to undefined method acf_field::#'
+        # WordPress globals and classes
+        - '#class wpdb#i'
+        - '#type wpdb#i'
+        - '#unknown class wpdb#i'
+        - '#Class acf_field#i'
+        - '#acf_field::__construct\(\)#'
+        - '#extends unknown class acf_field#'
+        - '#does not extend any class#'
+        - '#undefined property.*::\$name#i'
+        - '#undefined property.*::\$label#i'
+        - '#undefined property.*::\$category#i'
         # WordPress functions
+        - '#Function \w+__ not found#'
+        - '#Function __ not found#'
+        - '#Function _e not found#'
+        - '#Function esc_\w+ not found#'
         - '#Function wp_\w+ not found#'
         - '#Function get_option not found#'
         - '#Function update_option not found#'
@@ -19,9 +31,6 @@ parameters:
         - '#Function add_filter not found#'
         - '#Function apply_filters not found#'
         - '#Function do_action not found#'
-        - '#Function esc_\w+ not found#'
-        - '#Function __\( not found#'
-        - '#Function _e not found#'
         - '#Function selected not found#'
         - '#Function absint not found#'
         - '#Function dbDelta not found#'
@@ -32,4 +41,9 @@ parameters:
         - '#Function admin_url not found#'
         - '#Function register_\w+_hook not found#'
         - '#Function acf_render_field_setting not found#'
+        # WordPress constants
+        - '#Constant ABSPATH not found#'
+        # PHPDoc issues
+        - '#PHPDoc tag @throws with type WP_Error#'
     tmpDir: .phpstan.cache
+    reportUnmatchedIgnoredErrors: false

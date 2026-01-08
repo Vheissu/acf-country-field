@@ -6,7 +6,6 @@ declare(strict_types=1);
  * Pest configuration file.
  */
 
-use AcfCountryField\Tests\TestCase;
-
-// Set up Pest to use our TestCase for all tests
-pest()->extend(TestCase::class)->in('Unit');
+// Note: pest() function is only available after Pest is bootstrapped
+// The extends() call needs to happen through uses() in individual test files
+// or through the TestCase import

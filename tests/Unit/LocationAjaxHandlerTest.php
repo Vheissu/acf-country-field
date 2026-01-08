@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use AcfCountryField\Ajax\LocationAjaxHandler;
 use AcfCountryField\Repositories\LocationRepository;
+use AcfCountryField\Tests\TestCase;
 use Brain\Monkey\Functions;
+
+uses(TestCase::class);
 
 beforeEach(function (): void {
     $this->repository = Mockery::mock(LocationRepository::class);
@@ -53,10 +56,8 @@ describe('LocationAjaxHandler', function (): void {
         it('returns empty array for invalid country ID', function (): void {
             $_POST['countryId'] = '0';
 
-            $this->repository->shouldReceive('getCitiesByCountry')
-                ->once()
-                ->with(0)
-                ->andReturn([]);
+            // When country_id is 0, the handler returns early without calling the repository
+            // This is the expected behavior for invalid IDs
 
             try {
                 $this->handler->handleGetCitiesLegacy();

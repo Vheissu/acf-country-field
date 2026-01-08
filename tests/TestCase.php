@@ -38,7 +38,7 @@ class TestCase extends PHPUnitTestCase
         // Translation functions (pass through)
         Monkey\Functions\stubs([
             '__' => static fn(string $text, string $domain = 'default'): string => $text,
-            '_e' => static fn(string $text, string $domain = 'default'): void => print $text,
+            '_e' => static function(string $text, string $domain = 'default'): void { echo $text; },
             'esc_html__' => static fn(string $text, string $domain = 'default'): string => htmlspecialchars($text, ENT_QUOTES, 'UTF-8'),
             'esc_html' => static fn(string $text): string => htmlspecialchars($text, ENT_QUOTES, 'UTF-8'),
             'esc_attr' => static fn(string $text): string => htmlspecialchars($text, ENT_QUOTES, 'UTF-8'),
@@ -55,7 +55,7 @@ class TestCase extends PHPUnitTestCase
         Monkey\Functions\stubs([
             'wp_create_nonce' => static fn(string $action): string => 'test_nonce_' . $action,
             'wp_verify_nonce' => static fn(string $nonce, string $action): int|false => str_starts_with($nonce, 'test_nonce_') ? 1 : false,
-            'check_ajax_referer' => static fn(string $action, string $query_arg = false, bool $die = true): int|false => 1,
+            'check_ajax_referer' => static fn(string $action, string|false $query_arg = false, bool $die = true): int|false => 1,
             'wp_nonce_field' => static function(string $action = '', string $name = '_wpnonce', bool $referer = true, bool $echo = true): string {
                 $field = '<input type="hidden" name="' . $name . '" value="test_nonce_' . $action . '" />';
                 if ($echo) {
@@ -73,7 +73,7 @@ class TestCase extends PHPUnitTestCase
             'wp_send_json_success' => static function(mixed $data = null): void {
                 throw new \Exception('wp_send_json_success: ' . json_encode(['success' => true, 'data' => $data]));
             },
-            'wp_send_json_error' => static function(mixed $data = null, int $code = null): void {
+            'wp_send_json_error' => static function(mixed $data = null, ?int $code = null): void {
                 throw new \Exception('wp_send_json_error: ' . json_encode(['success' => false, 'data' => $data]));
             },
         ]);

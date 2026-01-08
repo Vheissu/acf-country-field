@@ -17,7 +17,6 @@ final class Plugin
 {
     private const VERSION = '2.0.0';
     private const MIN_PHP_VERSION = '8.0';
-    private const MIN_ACF_VERSION = '5.0.0';
 
     private static ?self $instance = null;
     private string $plugin_file;

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use AcfCountryField\Fields\CountryField;
 use AcfCountryField\Repositories\LocationRepository;
+use AcfCountryField\Tests\TestCase;
 use Brain\Monkey\Functions;
+
+uses(TestCase::class);
 
 beforeEach(function (): void {
     $this->repository = Mockery::mock(LocationRepository::class);

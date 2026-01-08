@@ -20,8 +20,12 @@ class Installer
 
     public function __construct(?\wpdb $wpdb = null)
     {
-        global $wpdb as $global_wpdb;
-        $this->wpdb = $wpdb ?? $global_wpdb;
+        if ($wpdb === null) {
+            global $wpdb;
+            $this->wpdb = $wpdb;
+        } else {
+            $this->wpdb = $wpdb;
+        }
 
         $this->countries_table = $this->wpdb->prefix . 'countries';
         $this->cities_table = $this->wpdb->prefix . 'cities';

@@ -19,14 +19,14 @@ class CountryField extends \acf_field
      *
      * @var array<string, mixed>
      */
-    public array $settings;
+    public $settings = [];
 
     /**
      * Default field values.
      *
      * @var array<string, mixed>
      */
-    public array $defaults;
+    public $defaults = [];
 
     private LocationRepository $repository;
 
@@ -140,6 +140,8 @@ class CountryField extends \acf_field
 
     /**
      * Render the country select field.
+     *
+     * @param array<int, string> $countries
      */
     private function renderCountrySelect(string $field_name, array $countries, int $selected_id): void
     {
@@ -164,6 +166,8 @@ class CountryField extends \acf_field
 
     /**
      * Render the city select field.
+     *
+     * @param array<int, string> $cities
      */
     private function renderCitySelect(string $field_name, array $cities, int $selected_id): void
     {
@@ -191,6 +195,8 @@ class CountryField extends \acf_field
 
     /**
      * Render the state select field (US only).
+     *
+     * @param array<int, string> $states
      */
     private function renderStateSelect(string $field_name, array $states, int $selected_id): void
     {

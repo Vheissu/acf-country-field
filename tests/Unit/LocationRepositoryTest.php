@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use AcfCountryField\Repositories\LocationRepository;
+use AcfCountryField\Tests\TestCase;
+
+uses(TestCase::class);
 
 beforeEach(function (): void {
     $this->wpdb = Mockery::mock('wpdb');
