@@ -319,7 +319,7 @@ class CountryField extends \acf_field
      * @param array<string, mixed> $field The field configuration
      * @return array<string, mixed>|null The formatted value
      */
-    public function format_value($value, $post_id, array $field): ?array
+    public function format_value($value, $post_id, array $field, $escape_html = false): ?array
     {
         if (!is_array($value)) {
             return null;

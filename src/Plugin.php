@@ -123,6 +123,11 @@ final class Plugin
      */
     public function registerFieldType(): void
     {
+        if (function_exists('acf_register_field_type')) {
+            acf_register_field_type(CountryField::class);
+            return;
+        }
+
         new CountryField();
     }
 

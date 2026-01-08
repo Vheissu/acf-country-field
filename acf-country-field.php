@@ -15,6 +15,7 @@ declare(strict_types=1);
  * Domain Path: /languages
  * Requires at least: 5.8
  * Requires PHP: 8.0
+ * Requires Plugins: advanced-custom-fields
  *
  * @package AcfCountryField
  */
