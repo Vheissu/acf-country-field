@@ -26,6 +26,9 @@ class acf_field_COUNTRY_FIELD extends acf_field {
             'dir' => apply_filters('acf/helpers/get_dir', __FILE__),
             'version' => '1.0.1'
         );
+
+        add_action('wp_ajax_get_country_cities', array($this,'get_country_cities'));
+        add_action('wp_ajax_get_us_states', array($this,'get_us_states'));    
     }
 
     function create_options($field)
@@ -278,7 +281,6 @@ class acf_field_COUNTRY_FIELD extends acf_field {
         }
     }
 
-    add_action('wp_ajax_get_country_cities', 'get_country_cities');
     function get_country_cities()
     {
         global $wpdb;
@@ -301,7 +303,6 @@ class acf_field_COUNTRY_FIELD extends acf_field {
         die();
     }
 
-    add_action("wp_ajax_get_us_states", "get_us_states");
     function get_us_states()
     {
         global $wpdb;
