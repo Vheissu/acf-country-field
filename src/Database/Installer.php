@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace AcfCountryField\Database;
 
-use AcfCountryField\Repositories\LocationRepository;
-
 /**
  * Creates, fills and removes the location tables.
  *
- * Location IDs are fixed, because saved field values and city rows refer to them. Version 1.0.1
- * inserted countries without their IDs, so tables filled by that version can't match countries
- * to cities. install() detects those tables and fills them again, and tidies up older tables.
+ * Location IDs are fixed, because saved field values and city rows refer to them. Version 1 kept
+ * the data in tables with generic names (`{prefix}countries` and so on). install() replaces them
+ * with the plugin's own tables, filled from the shipped data, and drops the old ones.
  */
 class Installer
 {
-    public const DB_VERSION = '2.1.0';
+    public const DB_VERSION = '2.1.0.1';
     public const VERSION_OPTION = 'acf_country_field_db_version';
 
     private const BATCH_SIZE = 1000;
@@ -34,9 +32,9 @@ class Installer
 
         $this->wpdb = $wpdb;
         $this->data_dir = $data_dir ?? dirname(__DIR__, 2) . '/data';
-        $this->countries_table = $wpdb->prefix . 'countries';
-        $this->states_table = $wpdb->prefix . 'states';
-        $this->cities_table = $wpdb->prefix . 'cities';
+        $this->countries_table = $wpdb->prefix . Tables::COUNTRIES;
+        $this->states_table = $wpdb->prefix . Tables::STATES;
+        $this->cities_table = $wpdb->prefix . Tables::CITIES;
     }
 
     public function needsInstall(): bool
@@ -45,7 +43,8 @@ class Installer
     }
 
     /**
-     * Creates or upgrades the tables and fills them. Safe to run more than once.
+     * Creates or upgrades the tables and fills them. Safe to run more than once, and finishes
+     * filling tables that an earlier run left part done.
      */
     public function install(): void
     {
@@ -59,7 +58,12 @@ class Installer
         }
 
         dbDelta($this->schema());
-        $this->fill();
+
+        $this->insert($this->countries_table, ['id', 'country'], ['%d', '%s'], $this->data('countries'));
+        $this->insert($this->states_table, ['id', 'state'], ['%d', '%s'], $this->data('states'));
+        $this->insert($this->cities_table, ['id', 'city', 'state', 'country'], ['%d', '%s', '%d', '%d'], $this->data('cities'));
+
+        $this->dropLegacyTables();
 
         update_option(self::VERSION_OPTION, self::DB_VERSION);
     }
@@ -70,11 +74,52 @@ class Installer
             $this->wpdb->query("DROP TABLE IF EXISTS {$table}");
         }
 
+        $this->dropLegacyTables();
+
         delete_option(self::VERSION_OPTION);
     }
 
     /**
-     * Table definitions in the format dbDelta() expects, so existing tables get the new columns and indexes.
+     * Drops version 1's tables. Another plugin could use the same generic names, so they're only
+     * dropped when all three exist with exactly version 1's columns.
+     */
+    private function dropLegacyTables(): void
+    {
+        $tables = [];
+
+        foreach (Tables::LEGACY as $name => $columns) {
+            $table = $this->wpdb->prefix . $name;
+
+            if ($this->columns($table) !== $columns) {
+                return;
+            }
+
+            $tables[] = $table;
+        }
+
+        foreach ($tables as $table) {
+            $this->wpdb->query("DROP TABLE IF EXISTS {$table}");
+        }
+    }
+
+    /**
+     * @return list<string> The table's column names, or none when it doesn't exist.
+     */
+    private function columns(string $table): array
+    {
+        $exists = $this->wpdb->get_var(
+            (string) $this->wpdb->prepare('SHOW TABLES LIKE %s', $this->wpdb->esc_like($table))
+        );
+
+        if ($exists !== $table) {
+            return [];
+        }
+
+        return array_map('strval', $this->wpdb->get_col((string) $this->wpdb->prepare('SHOW COLUMNS FROM %i', $table)));
+    }
+
+    /**
+     * Table definitions in the format dbDelta() expects.
      *
      * @return list<string>
      */
@@ -105,49 +150,6 @@ class Installer
   KEY city (city)
 ) {$charset_collate};",
         ];
-    }
-
-    private function fill(): void
-    {
-        $count = (int) $this->wpdb->get_var("SELECT COUNT(*) FROM {$this->countries_table}");
-
-        if ($count === 0 || $this->hasMismatchedIds()) {
-            foreach ([$this->cities_table, $this->states_table, $this->countries_table] as $table) {
-                $this->wpdb->query("TRUNCATE TABLE {$table}");
-            }
-
-            $this->insert($this->countries_table, ['id', 'country'], ['%d', '%s'], $this->data('countries'));
-            $this->insert($this->states_table, ['id', 'state'], ['%d', '%s'], $this->data('states'));
-            $this->insert($this->cities_table, ['id', 'city', 'state', 'country'], ['%d', '%s', '%d', '%d'], $this->data('cities'));
-
-            return;
-        }
-
-        // Tables from before 1.0.1 have the right IDs, but are missing Cote d'Ivoire.
-        $this->insert($this->countries_table, ['id', 'country'], ['%d', '%s'], $this->data('countries'));
-
-        // They also list Alabama to California twice. No city uses the first copies, IDs 1 to 5.
-        $this->wpdb->query(
-            "DELETE copy FROM {$this->states_table} AS copy
-            JOIN {$this->states_table} AS original ON original.id = copy.id + 5 AND original.state = copy.state
-            WHERE copy.id <= 5"
-        );
-    }
-
-    /**
-     * True when the tables were filled by version 1.0.1, which numbered countries from 1.
-     */
-    private function hasMismatchedIds(): bool
-    {
-        $usa_id = $this->wpdb->get_var(
-            (string) $this->wpdb->prepare(
-                "SELECT id FROM %i WHERE country = %s LIMIT 1",
-                $this->countries_table,
-                'United States of America'
-            )
-        );
-
-        return $usa_id !== null && (int) $usa_id !== LocationRepository::USA_COUNTRY_ID;
     }
 
     /**

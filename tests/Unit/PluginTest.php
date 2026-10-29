@@ -88,5 +88,5 @@ it('uninstalls every site on a network', function (): void {
     Plugin::uninstall();
 
     expect($switched)->toBe([1, 2])
-        ->and($GLOBALS['wpdb']->queries)->toHaveCount(6);
+        ->and(array_filter($GLOBALS['wpdb']->queries, static fn(string $sql): bool => str_starts_with($sql, 'DROP TABLE')))->toHaveCount(6);
 });

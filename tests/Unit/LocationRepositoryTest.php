@@ -16,7 +16,7 @@ it('lists countries by ID in query order', function (): void {
     ];
 
     expect($this->repository->getCountries())->toBe([248 => 'Australia', 446 => 'United States of America'])
-        ->and($this->wpdb->queries[0])->toContain('FROM wp_countries')
+        ->and($this->wpdb->queries[0])->toContain('FROM wp_acf_country_field_countries')
         ->and($this->wpdb->queries[0])->toContain('ORDER BY country ASC');
 });
 
@@ -52,7 +52,7 @@ it('lists states by ID', function (): void {
         ->and($this->repository->getState(2))->toBeNull()
         ->and($this->repository->findStateId('Alabama'))->toBe(1)
         ->and($this->repository->findStateId('Ontario'))->toBeNull()
-        ->and($this->wpdb->queries[0])->toContain('FROM wp_states');
+        ->and($this->wpdb->queries[0])->toContain('FROM wp_acf_country_field_states');
 });
 
 it('lists the cities in a country', function (): void {

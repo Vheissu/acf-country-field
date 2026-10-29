@@ -12,6 +12,7 @@ Version 2 is a rewrite. 2.0.0 was never released, so these notes cover the chang
 - `get_field()` returns integer IDs, and `null` when the field has never been saved.
 - New settings: Default Country, Show State and Show City.
 - City lists are loaded from a new AJAX action, `acf_country_field_cities`, which needs a nonce. It also works for logged-out visitors, so front-end forms made with `acf_form()` can load cities. The `get_country_cities` and `get_us_states` actions are gone.
+- The location tables are renamed to `{prefix}acf_country_field_countries`, `{prefix}acf_country_field_states` and `{prefix}acf_country_field_cities`, so they can't clash with other plugins. Version 1's `{prefix}countries`, `{prefix}states` and `{prefix}cities` are dropped on upgrade, but only when all three have exactly version 1's columns.
 - Location tables are filled with about 40 batched queries instead of 38,000 single ones, and are indexed by country and state.
 - Deactivating the plugin keeps the tables. Deleting it drops them, on every site in a network.
 - Requires WordPress 6.2 and PHP 8.0.
@@ -19,9 +20,9 @@ Version 2 is a rewrite. 2.0.0 was never released, so these notes cover the chang
 
 ### Fixed
 
-- Fresh 1.0.1 installs showed no cities for any country. Countries were inserted without their IDs, so they no longer matched the cities. Affected tables are filled again on upgrade, and saved values are matched to the corrected IDs by country name.
+- Fresh 1.0.1 installs showed no cities for any country. Countries were inserted without their IDs, so they no longer matched the cities. The new tables have the right IDs, and saved values are matched to them by country name.
 - Cote d'Ivoire was missing, though its cities were listed.
-- Alabama to California were listed twice, and the first copies had no cities. The copies are removed, and saved values are matched by state name. 14 duplicate cities are gone from new installs.
+- Alabama to California were listed twice, and the first copies had no cities. The new tables list them once, and saved values are matched by state name. 14 duplicate cities are gone too.
 - Cities were listed in ID order instead of alphabetically after changing the country.
 - Saving could store a city or state that didn't belong to the selected country.
 - A slow response for one country could overwrite the cities for a country chosen after it.

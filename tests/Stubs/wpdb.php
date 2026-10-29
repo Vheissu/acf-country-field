@@ -43,6 +43,16 @@ class wpdb
         return $this->run('get_row', $sql);
     }
 
+    public function get_col($sql)
+    {
+        return $this->run('get_col', $sql);
+    }
+
+    public function esc_like($text)
+    {
+        return addcslashes($text, '_%\\');
+    }
+
     public function get_var($sql)
     {
         return $this->run('get_var', $sql);

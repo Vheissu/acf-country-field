@@ -7,6 +7,7 @@ use Brain\Monkey\Functions;
 
 beforeEach(function (): void {
     $this->wpdb = new wpdb();
+    $this->wpdb->respond = static fn(string $method) => $method === 'query' ? 1 : null;
     $this->dbDelta = [];
 
     Functions\when('dbDelta')->alias(function (array $queries): array {
@@ -19,14 +20,20 @@ beforeEach(function (): void {
 });
 
 /**
- * @param array<string, mixed> $answers SQL fragments mapped to get_var() answers.
+ * Answers the installer's table checks as if the given tables exist with the given columns.
+ *
+ * @param array<string, list<string>> $tables
  */
-function respondTo(wpdb $wpdb, array $answers): void
+function withTables(wpdb $wpdb, array $tables): void
 {
-    $wpdb->respond = static function (string $method, string $sql) use ($answers) {
-        foreach ($answers as $fragment => $answer) {
-            if ($method === 'get_var' && str_contains($sql, $fragment)) {
-                return $answer;
+    $wpdb->respond = static function (string $method, string $sql) use ($tables) {
+        foreach ($tables as $table => $columns) {
+            if ($method === 'get_var' && $sql === "SHOW TABLES LIKE '" . addslashes(addcslashes($table, '_%\\')) . "'") {
+                return $table;
+            }
+
+            if ($method === 'get_col' && $sql === "SHOW COLUMNS FROM {$table}") {
+                return $columns;
             }
         }
 
@@ -45,35 +52,31 @@ function queriesStartingWith(wpdb $wpdb, string $start): array
 it('needs installing until the current version is stored', function (): void {
     expect($this->installer->needsInstall())->toBeTrue();
 
-    $this->siteOptions[Installer::VERSION_OPTION] = '2.0.0';
+    $this->siteOptions[Installer::VERSION_OPTION] = '2.1.0';
     expect($this->installer->needsInstall())->toBeTrue();
 
     $this->siteOptions[Installer::VERSION_OPTION] = Installer::DB_VERSION;
     expect($this->installer->needsInstall())->toBeFalse();
 });
 
-it('creates the three tables with dbDelta', function (): void {
-    respondTo($this->wpdb, ['COUNT(*)' => '0']);
-
+it('creates the plugin tables with dbDelta', function (): void {
     $this->installer->install();
 
     expect($this->dbDelta)->toHaveCount(3)
-        ->and($this->dbDelta[0])->toStartWith('CREATE TABLE wp_countries (')
-        ->and($this->dbDelta[1])->toStartWith('CREATE TABLE wp_states (')
-        ->and($this->dbDelta[2])->toStartWith('CREATE TABLE wp_cities (')
+        ->and($this->dbDelta[0])->toStartWith('CREATE TABLE wp_acf_country_field_countries (')
+        ->and($this->dbDelta[1])->toStartWith('CREATE TABLE wp_acf_country_field_states (')
+        ->and($this->dbDelta[2])->toStartWith('CREATE TABLE wp_acf_country_field_cities (')
         ->and($this->dbDelta[2])->toContain('PRIMARY KEY  (id)')
         ->and($this->dbDelta[2])->toContain('KEY country_state (country,state)')
         ->and($this->siteOptions[Installer::VERSION_OPTION])->toBe(Installer::DB_VERSION);
 });
 
-it('fills empty tables with every row and its fixed ID', function (): void {
-    respondTo($this->wpdb, ['COUNT(*)' => '0']);
-
+it('fills the tables with every row and its fixed ID', function (): void {
     $this->installer->install();
 
-    $inserts = queriesStartingWith($this->wpdb, 'INSERT IGNORE INTO');
-    $countries = array_values(array_filter($inserts, static fn($sql) => str_contains($sql, 'wp_countries')));
-    $cities = array_values(array_filter($inserts, static fn($sql) => str_contains($sql, 'wp_cities')));
+    $countries = queriesStartingWith($this->wpdb, 'INSERT IGNORE INTO wp_acf_country_field_countries');
+    $states = queriesStartingWith($this->wpdb, 'INSERT IGNORE INTO wp_acf_country_field_states');
+    $cities = queriesStartingWith($this->wpdb, 'INSERT IGNORE INTO wp_acf_country_field_cities');
 
     $country_rows = require dirname(__DIR__, 2) . '/data/countries.php';
     $city_rows = require dirname(__DIR__, 2) . '/data/cities.php';
@@ -82,46 +85,55 @@ it('fills empty tables with every row and its fixed ID', function (): void {
         ->and($countries[0])->toContain("(446, 'United States of America')")
         ->and($countries[0])->toContain("(3834, 'Cote d\\'Ivoire')")
         ->and(substr_count($countries[0], '),'))->toBe(count($country_rows) - 1)
+        ->and($states)->toHaveCount(1)
+        ->and($states[0])->toContain("(49, 'Texas')")
         ->and($cities)->toHaveCount((int) ceil(count($city_rows) / 1000))
         ->and($cities[0])->toContain("(914, 'Bost/Laskar', 0, 237)");
 });
 
-it('fills tables again when version 1.0.1 numbered the countries', function (): void {
-    respondTo($this->wpdb, ['COUNT(*)' => '211', 'United States of America' => '210']);
+it('drops version 1 tables', function (): void {
+    withTables($this->wpdb, [
+        'wp_cities' => ['id', 'city', 'state', 'country'],
+        'wp_states' => ['id', 'state'],
+        'wp_countries' => ['id', 'country'],
+    ]);
 
     $this->installer->install();
 
-    expect(queriesStartingWith($this->wpdb, 'TRUNCATE TABLE'))->toBe([
-        'TRUNCATE TABLE wp_cities',
-        'TRUNCATE TABLE wp_states',
-        'TRUNCATE TABLE wp_countries',
-    ])->and(queriesStartingWith($this->wpdb, 'INSERT IGNORE INTO wp_cities'))->not->toBeEmpty();
+    expect(queriesStartingWith($this->wpdb, 'DROP TABLE'))->toBe([
+        'DROP TABLE IF EXISTS wp_cities',
+        'DROP TABLE IF EXISTS wp_states',
+        'DROP TABLE IF EXISTS wp_countries',
+    ]);
 });
 
-it('tidies tables that have the right IDs', function (): void {
-    respondTo($this->wpdb, ['COUNT(*)' => '210', 'United States of America' => '446']);
+it('leaves tables with the old names alone when they belong to something else', function (array $tables): void {
+    withTables($this->wpdb, $tables);
 
     $this->installer->install();
 
-    $inserts = queriesStartingWith($this->wpdb, 'INSERT IGNORE INTO');
-    $deletes = queriesStartingWith($this->wpdb, 'DELETE copy FROM wp_states');
-
-    expect(queriesStartingWith($this->wpdb, 'TRUNCATE TABLE'))->toBe([])
-        ->and($inserts)->toHaveCount(1)
-        ->and($inserts[0])->toStartWith('INSERT IGNORE INTO wp_countries')
-        ->and($deletes)->toHaveCount(1)
-        ->and($deletes[0])->toContain('original.id = copy.id + 5 AND original.state = copy.state');
-});
+    expect(queriesStartingWith($this->wpdb, 'DROP TABLE'))->toBe([]);
+})->with([
+    'different columns' => [[
+        'wp_cities' => ['id', 'city', 'state', 'country'],
+        'wp_states' => ['id', 'state', 'code'],
+        'wp_countries' => ['id', 'country'],
+    ]],
+    'only some tables' => [[
+        'wp_cities' => ['id', 'city', 'state', 'country'],
+        'wp_countries' => ['id', 'country'],
+    ]],
+]);
 
 it('drops the tables and the version option on uninstall', function (): void {
     $this->siteOptions[Installer::VERSION_OPTION] = Installer::DB_VERSION;
 
     $this->installer->uninstall();
 
-    expect($this->wpdb->queries)->toBe([
-        'DROP TABLE IF EXISTS wp_cities',
-        'DROP TABLE IF EXISTS wp_states',
-        'DROP TABLE IF EXISTS wp_countries',
+    expect(queriesStartingWith($this->wpdb, 'DROP TABLE'))->toBe([
+        'DROP TABLE IF EXISTS wp_acf_country_field_cities',
+        'DROP TABLE IF EXISTS wp_acf_country_field_states',
+        'DROP TABLE IF EXISTS wp_acf_country_field_countries',
     ])->and($this->siteOptions)->not->toHaveKey(Installer::VERSION_OPTION);
 });
 

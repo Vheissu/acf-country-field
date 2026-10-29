@@ -24,7 +24,7 @@ Adds a **Country** field type to Advanced Custom Fields (ACF). Editors pick a co
 3. Activate **Advanced Custom Fields: Country Field**.
 4. Add a field to a field group and choose **Country** (under Choice).
 
-Activation creates three tables, `{prefix}countries`, `{prefix}states` and `{prefix}cities`, and fills them. The plugin needs no Composer install to run. Composer is only used for development.
+Activation creates three tables, `{prefix}acf_country_field_countries`, `{prefix}acf_country_field_states` and `{prefix}acf_country_field_cities`, and fills them. The plugin needs no Composer install to run. Composer is only used for development.
 
 ## Settings
 
@@ -66,8 +66,9 @@ update_field('location', ['country_id' => 248, 'city_id' => 1460], $post_id); //
 ## Upgrading from 1.x
 
 - Fields created with 1.x (type `COUNTRY_FIELD`) keep working. They show as **Country** in the field group editor, and saving the group stores the new type name.
-- Version 1.0.1 filled the country table with the wrong IDs, so no cities showed up. The plugin detects those tables and fills them again. Saved values are matched to the corrected IDs by country name.
-- Version 1 listed Alabama to California twice. The unused copies are removed, and saved values are matched by state name.
+- The location tables are renamed from `{prefix}countries`, `{prefix}states` and `{prefix}cities` to names starting with `{prefix}acf_country_field_`, so they can't clash with other plugins. The old tables are dropped, but only when all three have exactly version 1's columns. Update any custom queries that read them.
+- Version 1.0.1 filled the country table with the wrong IDs, so no cities showed up. The new tables have the right IDs, and saved values are matched to them by country name.
+- Version 1 listed Alabama to California twice. The new tables list them once, and saved values are matched by state name.
 - Chosen is no longer bundled. The field uses ACF's Select2.
 
 ## Uninstalling

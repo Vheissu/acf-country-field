@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AcfCountryField\Repositories;
 
+use AcfCountryField\Database\Tables;
+
 /**
  * Reads countries, US states and cities from the location tables.
  *
@@ -33,9 +35,9 @@ class LocationRepository
         }
 
         $this->wpdb = $wpdb;
-        $this->countries_table = $wpdb->prefix . 'countries';
-        $this->states_table = $wpdb->prefix . 'states';
-        $this->cities_table = $wpdb->prefix . 'cities';
+        $this->countries_table = $wpdb->prefix . Tables::COUNTRIES;
+        $this->states_table = $wpdb->prefix . Tables::STATES;
+        $this->cities_table = $wpdb->prefix . Tables::CITIES;
     }
 
     /**
