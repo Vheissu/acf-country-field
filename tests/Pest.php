@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-/**
- * Pest configuration file.
- */
+use AcfCountryField\Tests\TestCase;
 
-// Note: pest() function is only available after Pest is bootstrapped
-// The extends() call needs to happen through uses() in individual test files
-// or through the TestCase import
+require_once __DIR__ . '/Stubs/acf_field.php';
+require_once __DIR__ . '/Stubs/wpdb.php';
+
+uses(TestCase::class)->in('Unit');

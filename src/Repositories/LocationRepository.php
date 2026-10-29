@@ -5,213 +5,171 @@ declare(strict_types=1);
 namespace AcfCountryField\Repositories;
 
 /**
- * Repository for accessing location data (countries, cities, states).
+ * Reads countries, US states and cities from the location tables.
  *
- * All database queries use prepared statements to prevent SQL injection.
+ * Countries and states are small, so each list is loaded once per request and kept in memory.
+ *
+ * @phpstan-type City array{id: int, name: string, state_id: int, country_id: int}
  */
 class LocationRepository
 {
+    public const USA_COUNTRY_ID = 446;
+
     private \wpdb $wpdb;
     private string $countries_table;
-    private string $cities_table;
     private string $states_table;
+    private string $cities_table;
 
-    public const USA_COUNTRY_ID = 446;
+    /** @var array<int, string>|null */
+    private ?array $countries = null;
+
+    /** @var array<int, string>|null */
+    private ?array $states = null;
 
     public function __construct(?\wpdb $wpdb = null)
     {
         if ($wpdb === null) {
             global $wpdb;
-            $this->wpdb = $wpdb;
-        } else {
-            $this->wpdb = $wpdb;
         }
 
-        $this->countries_table = $this->wpdb->prefix . 'countries';
-        $this->cities_table = $this->wpdb->prefix . 'cities';
-        $this->states_table = $this->wpdb->prefix . 'states';
+        $this->wpdb = $wpdb;
+        $this->countries_table = $wpdb->prefix . 'countries';
+        $this->states_table = $wpdb->prefix . 'states';
+        $this->cities_table = $wpdb->prefix . 'cities';
     }
 
     /**
-     * Get all countries ordered alphabetically.
-     *
-     * @return array<int, string> Associative array of country_id => country_name
+     * @return array<int, string> Country names keyed by ID, sorted by name.
      */
     public function getCountries(): array
     {
-        $results = $this->wpdb->get_results(
-            "SELECT DISTINCT id, country FROM {$this->countries_table} WHERE country != '' ORDER BY country ASC"
-        );
-
-        if (!$results) {
-            return [];
+        if ($this->countries === null) {
+            $this->countries = $this->pairs(
+                "SELECT id, country AS name FROM {$this->countries_table} WHERE country != '' ORDER BY country ASC"
+            );
         }
 
-        $countries = [];
-        foreach ($results as $row) {
-            $countries[(int) $row->id] = $row->country;
-        }
-
-        return $countries;
+        return $this->countries;
     }
 
-    /**
-     * Get a single country by ID.
-     *
-     * @param int $country_id The country ID
-     * @return string|null The country name or null if not found
-     */
     public function getCountry(int $country_id): ?string
     {
-        if ($country_id <= 0) {
-            return null;
-        }
+        return $this->getCountries()[$country_id] ?? null;
+    }
 
-        $result = $this->wpdb->get_var(
-            $this->wpdb->prepare(
-                "SELECT country FROM {$this->countries_table} WHERE id = %d",
-                $country_id
-            )
-        );
+    public function findCountryId(string $name): ?int
+    {
+        $id = array_search($name, $this->getCountries(), true);
 
-        return $result ?: null;
+        return $id === false ? null : $id;
     }
 
     /**
-     * Get all cities for a given country.
-     *
-     * @param int $country_id The country ID
-     * @return array<int, string> Associative array of city_id => city_name
+     * @return array<int, string> US state names keyed by ID, sorted by name.
      */
-    public function getCitiesByCountry(int $country_id): array
+    public function getStates(): array
+    {
+        if ($this->states === null) {
+            $this->states = $this->pairs(
+                "SELECT id, state AS name FROM {$this->states_table} WHERE state != '' ORDER BY state ASC"
+            );
+        }
+
+        return $this->states;
+    }
+
+    public function getState(int $state_id): ?string
+    {
+        return $this->getStates()[$state_id] ?? null;
+    }
+
+    public function findStateId(string $name): ?int
+    {
+        $id = array_search($name, $this->getStates(), true);
+
+        return $id === false ? null : $id;
+    }
+
+    /**
+     * Cities in a country, optionally limited to one US state.
+     *
+     * @return array<int, string> City names keyed by ID, sorted by name.
+     */
+    public function getCities(int $country_id, int $state_id = 0): array
     {
         if ($country_id <= 0) {
             return [];
         }
 
-        $results = $this->wpdb->get_results(
-            $this->wpdb->prepare(
-                "SELECT DISTINCT id, city FROM {$this->cities_table} WHERE country = %d AND city != '' ORDER BY city ASC",
+        if ($state_id > 0) {
+            $sql = $this->wpdb->prepare(
+                "SELECT id, city AS name FROM %i WHERE country = %d AND state = %d AND city != '' ORDER BY city ASC",
+                $this->cities_table,
+                $country_id,
+                $state_id
+            );
+        } else {
+            $sql = $this->wpdb->prepare(
+                "SELECT id, city AS name FROM %i WHERE country = %d AND city != '' ORDER BY city ASC",
+                $this->cities_table,
                 $country_id
-            )
-        );
-
-        if (!$results) {
-            return [];
+            );
         }
 
-        $cities = [];
-        foreach ($results as $row) {
-            $cities[(int) $row->id] = $row->city;
-        }
-
-        return $cities;
+        return $this->pairs((string) $sql);
     }
 
     /**
-     * Get a single city by ID.
-     *
-     * @param int $city_id The city ID
-     * @return string|null The city name or null if not found
+     * @return City|null
      */
-    public function getCity(int $city_id): ?string
+    public function getCity(int $city_id): ?array
     {
         if ($city_id <= 0) {
             return null;
         }
 
-        $result = $this->wpdb->get_var(
-            $this->wpdb->prepare(
-                "SELECT city FROM {$this->cities_table} WHERE id = %d",
+        $row = $this->wpdb->get_row(
+            (string) $this->wpdb->prepare(
+                "SELECT id, city, state, country FROM %i WHERE id = %d",
+                $this->cities_table,
                 $city_id
             )
         );
 
-        return $result ?: null;
-    }
-
-    /**
-     * Get all US states ordered alphabetically.
-     *
-     * @return array<int, string> Associative array of state_id => state_name
-     */
-    public function getStates(): array
-    {
-        $results = $this->wpdb->get_results(
-            "SELECT DISTINCT id, state FROM {$this->states_table} WHERE state != '' ORDER BY state ASC"
-        );
-
-        if (!$results) {
-            return [];
-        }
-
-        $states = [];
-        foreach ($results as $row) {
-            $states[(int) $row->id] = $row->state;
-        }
-
-        return $states;
-    }
-
-    /**
-     * Get a single state by ID.
-     *
-     * @param int $state_id The state ID
-     * @return string|null The state name or null if not found
-     */
-    public function getState(int $state_id): ?string
-    {
-        if ($state_id <= 0) {
+        if (!is_object($row) || (string) $row->city === '') {
             return null;
         }
 
-        $result = $this->wpdb->get_var(
-            $this->wpdb->prepare(
-                "SELECT state FROM {$this->states_table} WHERE id = %d",
-                $state_id
-            )
-        );
-
-        return $result ?: null;
+        return [
+            'id' => (int) $row->id,
+            'name' => (string) $row->city,
+            'state_id' => (int) $row->state,
+            'country_id' => (int) $row->country,
+        ];
     }
 
-    /**
-     * Check if a country ID represents the United States.
-     *
-     * @param int $country_id The country ID to check
-     * @return bool True if the country is USA
-     */
     public function isUnitedStates(int $country_id): bool
     {
         return $country_id === self::USA_COUNTRY_ID;
     }
 
     /**
-     * Check if the location tables exist.
-     *
-     * @return bool True if all tables exist
+     * @return array<int, string>
      */
-    public function tablesExist(): bool
+    private function pairs(string $sql): array
     {
-        $tables = [
-            $this->countries_table,
-            $this->cities_table,
-            $this->states_table,
-        ];
+        $rows = $this->wpdb->get_results($sql);
 
-        foreach ($tables as $table) {
-            $exists = $this->wpdb->get_var(
-                $this->wpdb->prepare(
-                    "SHOW TABLES LIKE %s",
-                    $table
-                )
-            );
-
-            if ($exists !== $table) {
-                return false;
-            }
+        if (!is_array($rows)) {
+            return [];
         }
 
-        return true;
+        $pairs = [];
+
+        foreach ($rows as $row) {
+            $pairs[(int) $row->id] = (string) $row->name;
+        }
+
+        return $pairs;
     }
 }

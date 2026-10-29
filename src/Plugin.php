@@ -7,109 +7,38 @@ namespace AcfCountryField;
 use AcfCountryField\Ajax\LocationAjaxHandler;
 use AcfCountryField\Database\Installer;
 use AcfCountryField\Fields\CountryField;
+use AcfCountryField\Fields\LegacyCountryField;
 
 /**
- * Main plugin class.
- *
- * Handles plugin initialization, hooks, and lifecycle.
+ * Wires the plugin into WordPress and ACF.
  */
 final class Plugin
 {
-    private const VERSION = '2.0.0';
-    private const MIN_PHP_VERSION = '8.0';
+    public const VERSION = '2.1.0';
 
-    private static ?self $instance = null;
+    // Matches LegacyCountryField::TYPE. That class can't load before ACF does, so it isn't referenced here.
+    private const LEGACY_FIELD_TYPE = 'COUNTRY_FIELD';
+
     private string $plugin_file;
-    private Installer $installer;
-    private LocationAjaxHandler $ajax_handler;
 
-    private function __construct(string $plugin_file)
+    public function __construct(string $plugin_file)
     {
         $this->plugin_file = $plugin_file;
-        $this->installer = new Installer();
-        $this->ajax_handler = new LocationAjaxHandler();
     }
 
-    /**
-     * Get singleton instance.
-     */
-    public static function getInstance(string $plugin_file = ''): self
-    {
-        if (self::$instance === null) {
-            self::$instance = new self($plugin_file);
-        }
-
-        return self::$instance;
-    }
-
-    /**
-     * Initialize the plugin.
-     */
     public function init(): void
     {
-        // Check requirements
-        if (!$this->checkRequirements()) {
-            return;
-        }
+        // Before ACF registers field types on init (priority 5), so labels are translated.
+        add_action('init', [$this, 'loadTextdomain'], 0);
+        add_action('acf/include_field_types', [$this, 'registerFieldTypes']);
+        add_filter('acf/load_field/type=' . self::LEGACY_FIELD_TYPE, [$this, 'upgradeLegacyField']);
+        add_action('admin_init', [$this, 'maybeInstall']);
+        add_action('admin_notices', [$this, 'renderMissingAcfNotice']);
 
-        // Load translations
-        $this->loadTextdomain();
-
-        // Register AJAX handlers
-        $this->ajax_handler->register();
-
-        // Register ACF field type
-        add_action('acf/include_field_types', [$this, 'registerFieldType']);
-
-        // Check for upgrades
-        add_action('admin_init', [$this, 'maybeUpgrade']);
+        (new LocationAjaxHandler())->register();
     }
 
-    /**
-     * Check if plugin requirements are met.
-     */
-    private function checkRequirements(): bool
-    {
-        // Check PHP version
-        if (version_compare(PHP_VERSION, self::MIN_PHP_VERSION, '<')) {
-            add_action('admin_notices', function (): void {
-                $message = sprintf(
-                    /* translators: 1: Required PHP version, 2: Current PHP version */
-                    __('ACF Country Field requires PHP %1$s or higher. You are running PHP %2$s.', 'acf-country-field'),
-                    self::MIN_PHP_VERSION,
-                    PHP_VERSION
-                );
-                printf('<div class="notice notice-error"><p>%s</p></div>', esc_html($message));
-            });
-
-            return false;
-        }
-
-        // Check if ACF is active
-        if (!$this->isAcfActive()) {
-            add_action('admin_notices', function (): void {
-                $message = __('ACF Country Field requires Advanced Custom Fields to be installed and activated.', 'acf-country-field');
-                printf('<div class="notice notice-error"><p>%s</p></div>', esc_html($message));
-            });
-
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Check if ACF is active.
-     */
-    private function isAcfActive(): bool
-    {
-        return class_exists('ACF') || class_exists('acf');
-    }
-
-    /**
-     * Load plugin translations.
-     */
-    private function loadTextdomain(): void
+    public function loadTextdomain(): void
     {
         load_plugin_textdomain(
             'acf-country-field',
@@ -118,102 +47,76 @@ final class Plugin
         );
     }
 
-    /**
-     * Register the ACF field type.
-     */
-    public function registerFieldType(): void
+    public function registerFieldTypes(): void
     {
-        if (function_exists('acf_register_field_type')) {
-            acf_register_field_type(CountryField::class);
+        acf_register_field_type(new CountryField($this->plugin_file));
+        acf_register_field_type(new LegacyCountryField($this->plugin_file));
+    }
+
+    /**
+     * Version 1 registered the field type as "COUNTRY_FIELD". Loading those fields as the current
+     * type means the field group editor shows the right type, and saving the group stores it.
+     *
+     * @param array<string, mixed> $field
+     * @return array<string, mixed>
+     */
+    public function upgradeLegacyField(array $field): array
+    {
+        $field['type'] = CountryField::TYPE;
+
+        return $field;
+    }
+
+    /**
+     * Installs or upgrades the location tables for the current site when needed. This covers
+     * plugin updates that skip activation, and sites on a network where the plugin is network activated.
+     */
+    public function maybeInstall(): void
+    {
+        $installer = new Installer();
+
+        if ($installer->needsInstall()) {
+            $installer->install();
+        }
+    }
+
+    /**
+     * Warn administrators when ACF isn't loaded. Checked late so ACF bundled in a theme still counts.
+     */
+    public function renderMissingAcfNotice(): void
+    {
+        if (class_exists('ACF') || !current_user_can('activate_plugins')) {
             return;
         }
 
-        new CountryField();
+        printf(
+            '<div class="notice notice-error"><p>%s</p></div>',
+            esc_html__(
+                'ACF Country Field requires Advanced Custom Fields to be installed and activated.',
+                'acf-country-field'
+            )
+        );
     }
 
-    /**
-     * Check if database upgrade is needed.
-     */
-    public function maybeUpgrade(): void
-    {
-        if ($this->installer->needsUpgrade()) {
-            $this->installer->upgrade();
-        }
-    }
-
-    /**
-     * Plugin activation hook.
-     */
     public static function activate(): void
     {
-        $installer = new Installer();
-        $installer->install();
-
-        // Clear any cached data
-        wp_cache_flush();
+        (new Installer())->install();
     }
 
     /**
-     * Plugin deactivation hook.
-     *
-     * Note: We don't remove data on deactivation, only on uninstall.
-     */
-    public static function deactivate(): void
-    {
-        // Clear any cached data
-        wp_cache_flush();
-    }
-
-    /**
-     * Plugin uninstall hook.
-     *
-     * Removes all plugin data including database tables.
+     * Drops the location tables on every site. Called from uninstall.php.
      */
     public static function uninstall(): void
     {
-        $installer = new Installer();
-        $installer->uninstall();
+        if (!is_multisite()) {
+            (new Installer())->uninstall();
+            return;
+        }
 
-        // Clean up any options
-        delete_option('acf_country_field_db_version');
-    }
-
-    /**
-     * Get plugin version.
-     */
-    public static function getVersion(): string
-    {
-        return self::VERSION;
-    }
-
-    /**
-     * Get plugin directory path.
-     */
-    public function getPath(): string
-    {
-        return plugin_dir_path($this->plugin_file);
-    }
-
-    /**
-     * Get plugin directory URL.
-     */
-    public function getUrl(): string
-    {
-        return plugin_dir_url($this->plugin_file);
-    }
-
-    /**
-     * Prevent cloning.
-     */
-    private function __clone()
-    {
-    }
-
-    /**
-     * Prevent unserialization.
-     */
-    public function __wakeup(): void
-    {
-        throw new \Exception('Cannot unserialize singleton');
+        foreach (get_sites(['fields' => 'ids', 'number' => 0]) as $site_id) {
+            switch_to_blog((int) $site_id);
+            (new Installer())->uninstall();
+            restore_current_blog();
+        }
     }
 }

@@ -4,179 +4,177 @@ declare(strict_types=1);
 
 namespace AcfCountryField\Database;
 
+use AcfCountryField\Repositories\LocationRepository;
+
 /**
- * Handles database table creation and removal.
+ * Creates, fills and removes the location tables.
  *
- * Note: Uses direct SQL for table creation/removal instead of dbDelta
- * because dbDelta doesn't support DROP TABLE statements.
+ * Location IDs are fixed, because saved field values and city rows refer to them. Version 1.0.1
+ * inserted countries without their IDs, so tables filled by that version can't match countries
+ * to cities. install() detects those tables and fills them again, and tidies up older tables.
  */
 class Installer
 {
-    private \wpdb $wpdb;
-    private string $countries_table;
-    private string $cities_table;
-    private string $states_table;
-    private string $charset_collate;
+    public const DB_VERSION = '2.1.0';
+    public const VERSION_OPTION = 'acf_country_field_db_version';
 
-    public function __construct(?\wpdb $wpdb = null)
+    private const BATCH_SIZE = 1000;
+
+    private \wpdb $wpdb;
+    private string $data_dir;
+    private string $countries_table;
+    private string $states_table;
+    private string $cities_table;
+
+    public function __construct(?\wpdb $wpdb = null, ?string $data_dir = null)
     {
         if ($wpdb === null) {
             global $wpdb;
-            $this->wpdb = $wpdb;
-        } else {
-            $this->wpdb = $wpdb;
         }
 
-        $this->countries_table = $this->wpdb->prefix . 'countries';
-        $this->cities_table = $this->wpdb->prefix . 'cities';
-        $this->states_table = $this->wpdb->prefix . 'states';
-        $this->charset_collate = $this->wpdb->get_charset_collate();
+        $this->wpdb = $wpdb;
+        $this->data_dir = $data_dir ?? dirname(__DIR__, 2) . '/data';
+        $this->countries_table = $wpdb->prefix . 'countries';
+        $this->states_table = $wpdb->prefix . 'states';
+        $this->cities_table = $wpdb->prefix . 'cities';
+    }
+
+    public function needsInstall(): bool
+    {
+        return version_compare((string) get_option(self::VERSION_OPTION, '0'), self::DB_VERSION, '<');
     }
 
     /**
-     * Install database tables and populate with data.
+     * Creates or upgrades the tables and fills them. Safe to run more than once.
      */
     public function install(): void
     {
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-
-        $this->createTables();
-        $this->populateData();
-
-        // Store installed version
-        update_option('acf_country_field_db_version', '2.0.0');
-    }
-
-    /**
-     * Create the database tables using proper charset.
-     */
-    private function createTables(): void
-    {
-        // Countries table
-        $sql_countries = "CREATE TABLE IF NOT EXISTS {$this->countries_table} (
-            id INT(3) UNSIGNED NOT NULL AUTO_INCREMENT,
-            country VARCHAR(100) NOT NULL DEFAULT '',
-            PRIMARY KEY (id),
-            KEY country_idx (country)
-        ) {$this->charset_collate};";
-
-        // Cities table
-        $sql_cities = "CREATE TABLE IF NOT EXISTS {$this->cities_table} (
-            id INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
-            city VARCHAR(200) NOT NULL DEFAULT '',
-            state INT(3) UNSIGNED DEFAULT 0,
-            country INT(3) UNSIGNED NOT NULL DEFAULT 0,
-            PRIMARY KEY (id),
-            KEY country_idx (country),
-            KEY city_idx (city)
-        ) {$this->charset_collate};";
-
-        // States table
-        $sql_states = "CREATE TABLE IF NOT EXISTS {$this->states_table} (
-            id TINYINT(3) UNSIGNED NOT NULL AUTO_INCREMENT,
-            state VARCHAR(50) NOT NULL DEFAULT '',
-            PRIMARY KEY (id),
-            KEY state_idx (state)
-        ) {$this->charset_collate};";
-
-        dbDelta($sql_countries);
-        dbDelta($sql_cities);
-        dbDelta($sql_states);
-    }
-
-    /**
-     * Populate tables with location data.
-     */
-    private function populateData(): void
-    {
-        // Check if data already exists
-        $count = $this->wpdb->get_var("SELECT COUNT(*) FROM {$this->countries_table}");
-
-        if ((int) $count > 0) {
-            return; // Data already populated
+        if (!function_exists('dbDelta')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         }
 
-        // Include the data file (captures output for dbDelta)
-        $data_file = dirname(__DIR__, 2) . '/lib/install-data.php';
-
-        if (file_exists($data_file)) {
-            ob_start();
-            require $data_file;
-            $sql = ob_get_clean();
-
-            if (!empty($sql)) {
-                // Execute the SQL statements
-                $this->executeMultipleStatements($sql);
-            }
+        // Filling the tables runs about 40 large queries.
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(300);
         }
+
+        dbDelta($this->schema());
+        $this->fill();
+
+        update_option(self::VERSION_OPTION, self::DB_VERSION);
     }
 
-    /**
-     * Execute multiple SQL statements.
-     *
-     * @param string $sql Multiple SQL statements separated by semicolons
-     */
-    private function executeMultipleStatements(string $sql): void
-    {
-        // Split by semicolons (handling INSERT statements)
-        $statements = explode(";\n", $sql);
-
-        foreach ($statements as $statement) {
-            $statement = trim($statement);
-
-            // Skip empty statements and CREATE TABLE (already done)
-            if (empty($statement) || stripos($statement, 'CREATE TABLE') === 0) {
-                continue;
-            }
-
-            // Execute INSERT statements
-            if (stripos($statement, 'INSERT') === 0) {
-                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Data file contains static SQL
-                $this->wpdb->query($statement);
-            }
-        }
-    }
-
-    /**
-     * Uninstall database tables.
-     *
-     * Note: Only call this on complete plugin uninstall, not deactivation.
-     * This preserves user data during temporary deactivations.
-     */
     public function uninstall(): void
     {
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table names are constructed from wpdb prefix
-        $this->wpdb->query("DROP TABLE IF EXISTS {$this->cities_table}");
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $this->wpdb->query("DROP TABLE IF EXISTS {$this->states_table}");
-        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-        $this->wpdb->query("DROP TABLE IF EXISTS {$this->countries_table}");
+        foreach ([$this->cities_table, $this->states_table, $this->countries_table] as $table) {
+            $this->wpdb->query("DROP TABLE IF EXISTS {$table}");
+        }
 
-        delete_option('acf_country_field_db_version');
+        delete_option(self::VERSION_OPTION);
     }
 
     /**
-     * Check if upgrade is needed.
+     * Table definitions in the format dbDelta() expects, so existing tables get the new columns and indexes.
      *
-     * @return bool True if upgrade is needed
+     * @return list<string>
      */
-    public function needsUpgrade(): bool
+    private function schema(): array
     {
-        $installed_version = get_option('acf_country_field_db_version', '0');
-        return version_compare($installed_version, '2.0.0', '<');
+        $charset_collate = $this->wpdb->get_charset_collate();
+
+        return [
+            "CREATE TABLE {$this->countries_table} (
+  id int(10) unsigned NOT NULL auto_increment,
+  country varchar(100) NOT NULL default '',
+  PRIMARY KEY  (id),
+  KEY country (country)
+) {$charset_collate};",
+            "CREATE TABLE {$this->states_table} (
+  id smallint(5) unsigned NOT NULL auto_increment,
+  state varchar(50) NOT NULL default '',
+  PRIMARY KEY  (id),
+  KEY state (state)
+) {$charset_collate};",
+            "CREATE TABLE {$this->cities_table} (
+  id int(10) unsigned NOT NULL auto_increment,
+  city varchar(200) NOT NULL default '',
+  state smallint(5) unsigned NOT NULL default 0,
+  country int(10) unsigned NOT NULL default 0,
+  PRIMARY KEY  (id),
+  KEY country_state (country,state),
+  KEY city (city)
+) {$charset_collate};",
+        ];
+    }
+
+    private function fill(): void
+    {
+        $count = (int) $this->wpdb->get_var("SELECT COUNT(*) FROM {$this->countries_table}");
+
+        if ($count === 0 || $this->hasMismatchedIds()) {
+            foreach ([$this->cities_table, $this->states_table, $this->countries_table] as $table) {
+                $this->wpdb->query("TRUNCATE TABLE {$table}");
+            }
+
+            $this->insert($this->countries_table, ['id', 'country'], ['%d', '%s'], $this->data('countries'));
+            $this->insert($this->states_table, ['id', 'state'], ['%d', '%s'], $this->data('states'));
+            $this->insert($this->cities_table, ['id', 'city', 'state', 'country'], ['%d', '%s', '%d', '%d'], $this->data('cities'));
+
+            return;
+        }
+
+        // Tables from before 1.0.1 have the right IDs, but are missing Cote d'Ivoire.
+        $this->insert($this->countries_table, ['id', 'country'], ['%d', '%s'], $this->data('countries'));
+
+        // They also list Alabama to California twice. No city uses the first copies, IDs 1 to 5.
+        $this->wpdb->query(
+            "DELETE copy FROM {$this->states_table} AS copy
+            JOIN {$this->states_table} AS original ON original.id = copy.id + 5 AND original.state = copy.state
+            WHERE copy.id <= 5"
+        );
     }
 
     /**
-     * Run upgrade routines.
+     * True when the tables were filled by version 1.0.1, which numbered countries from 1.
      */
-    public function upgrade(): void
+    private function hasMismatchedIds(): bool
     {
-        $installed_version = get_option('acf_country_field_db_version', '0');
+        $usa_id = $this->wpdb->get_var(
+            (string) $this->wpdb->prepare(
+                "SELECT id FROM %i WHERE country = %s LIMIT 1",
+                $this->countries_table,
+                'United States of America'
+            )
+        );
 
-        // Upgrade from v1.x to v2.0
-        if (version_compare($installed_version, '2.0.0', '<')) {
-            $this->createTables(); // Ensures tables have correct charset
-            update_option('acf_country_field_db_version', '2.0.0');
+        return $usa_id !== null && (int) $usa_id !== LocationRepository::USA_COUNTRY_ID;
+    }
+
+    /**
+     * @return list<list<int|string>>
+     */
+    private function data(string $name): array
+    {
+        return require $this->data_dir . '/' . $name . '.php';
+    }
+
+    /**
+     * Inserts rows in batches, skipping any whose ID already exists.
+     *
+     * @param list<string> $columns
+     * @param list<string> $formats
+     * @param list<list<int|string>> $rows
+     */
+    private function insert(string $table, array $columns, array $formats, array $rows): void
+    {
+        $placeholders = '(' . implode(', ', $formats) . ')';
+        $prefix = "INSERT IGNORE INTO {$table} (" . implode(', ', $columns) . ') VALUES ';
+
+        foreach (array_chunk($rows, self::BATCH_SIZE) as $batch) {
+            $sql = $prefix . implode(', ', array_fill(0, count($batch), $placeholders));
+
+            // @phpstan-ignore argument.type (the query is built from the table name and fixed placeholders.)
+            $this->wpdb->query((string) $this->wpdb->prepare($sql, ...array_merge(...$batch)));
         }
     }
 }

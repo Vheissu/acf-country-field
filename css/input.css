@@ -1,118 +1,29 @@
 /**
- * ACF Country Field Styles
+ * ACF Country Field styles.
  *
  * @package AcfCountryField
  */
 
-/* Field wrapper */
-.acf-country-field-wrapper,
-.country-selector-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+.acf-country-field {
+    display: grid;
+    gap: 12px;
 }
 
-/* Individual field items */
-.acf-country-field-wrapper li,
-.acf-country-selector-list li,
-.country-selector-list li {
-    position: relative;
-    margin: 0 0 15px 0;
-    list-style: none;
+.acf-country-field__part[hidden] {
+    display: none;
 }
 
-.acf-country-field-wrapper li:last-child,
-.acf-country-selector-list li:last-child,
-.country-selector-list li:last-child {
-    margin-bottom: 0;
-}
-
-/* Labels */
-.acf-country-field-wrapper label strong,
-.acf-country-selector-list label strong,
-.country-selector-list li strong {
+.acf-country-field__part label {
     display: block;
-    color: #1e1e1e;
-    font-weight: 600;
-    margin-bottom: 5px;
-    font-size: 13px;
+    margin-bottom: 4px;
+    font-weight: 500;
 }
 
-/* Select fields */
-.acf-country-field-wrapper select,
-.acf-country-selector-list select,
-.country-selector-list select {
+.acf-country-field__part select {
     width: 100%;
     max-width: 100%;
 }
 
-/* Loading indicator */
-.acf-loading-indicator,
-.css3-loader {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 10;
-}
-
-/* ACF-style spinner */
-.acf-loading-indicator .acf-spinner {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    background: url('../images/spinner.gif') no-repeat center;
-    background-size: contain;
-}
-
-/* Legacy spinner animation */
-.css3-loader {
-    height: 44px;
-    width: 128px;
-    top: 0;
-    left: 0;
-    transform: none;
-}
-
-.css3-loader .css3-spinner {
-    background-color: #0073aa;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    animation: acf_country_bounce 1s infinite ease-in-out;
-}
-
-@keyframes acf_country_bounce {
-    0%, 100% {
-        transform: scale(0.8);
-        opacity: 0.5;
-    }
-    50% {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-
-/* Hide field inner while loading */
-.acf-country-field-wrapper .acf-field-inner[style*="hidden"],
-.country-selector-list .field-inner[style*="hidden"] {
-    opacity: 0.5;
-}
-
-/* Chosen enhancements */
-.acf-country-field-wrapper .chosen-container,
-.country-selector-list .chosen-container {
-    width: 100% !important;
-}
-
-/* Responsive adjustments */
-@media screen and (max-width: 782px) {
-    .acf-country-field-wrapper li,
-    .acf-country-selector-list li,
-    .country-selector-list li {
-        margin-bottom: 20px;
-    }
+.acf-country-field[aria-busy="true"] [data-part="city"] {
+    opacity: 0.6;
 }

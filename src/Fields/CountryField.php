@@ -5,361 +5,410 @@ declare(strict_types=1);
 namespace AcfCountryField\Fields;
 
 use AcfCountryField\Ajax\LocationAjaxHandler;
+use AcfCountryField\Plugin;
 use AcfCountryField\Repositories\LocationRepository;
 
 /**
- * ACF Country Field implementation.
+ * ACF field type for picking a country, then a city. US addresses also get a state, which
+ * narrows the city list.
  *
- * Provides a compound field for selecting country, city, and state (US only).
+ * The stored value keeps the names next to the IDs, so templates don't need the location tables.
+ *
+ * @phpstan-type Location array{
+ *     country_id: int,
+ *     country_name: string,
+ *     state_id: int,
+ *     state_name: string,
+ *     city_id: int,
+ *     city_name: string
+ * }
  */
 class CountryField extends \acf_field
 {
-    /**
-     * Field settings.
-     *
-     * @var array<string, mixed>
-     */
-    public $settings = [];
+    public const TYPE = 'country_field';
 
-    /**
-     * Default field values.
-     *
-     * @var array<string, mixed>
-     */
-    public $defaults = [];
+    private const TEXT_DOMAIN = 'acf-country-field';
+    private const HANDLE = 'acf-country-field';
 
+    private string $plugin_file;
     private LocationRepository $repository;
 
-    public function __construct(?LocationRepository $repository = null)
+    public function __construct(string $plugin_file, ?LocationRepository $repository = null)
     {
+        $this->plugin_file = $plugin_file;
         $this->repository = $repository ?? new LocationRepository();
-
-        $this->name = 'country_field';
-        $this->label = __('Country', 'acf-country-field');
-        $this->category = 'basic';
-
-        $this->defaults = [
-            'country_id' => 0,
-            'country_name' => '',
-            'city_id' => 0,
-            'city_name' => '',
-            'state_id' => 0,
-            'state_name' => '',
-            'default_country' => LocationRepository::USA_COUNTRY_ID,
-            'show_city' => true,
-            'show_state' => true,
-        ];
-
-        $this->settings = [
-            'path' => plugin_dir_path(__DIR__ . '/../'),
-            'dir' => plugin_dir_url(__DIR__ . '/../'),
-            'version' => '2.0.0',
-        ];
 
         parent::__construct();
     }
 
     /**
-     * Render field settings in the ACF field group editor.
-     *
-     * @param array<string, mixed> $field The field configuration
+     * Set up the field type. Called by the acf_field constructor.
      */
-    public function render_field_settings(array $field): void
+    public function initialize(): void
     {
-        // Default country setting
-        acf_render_field_setting($field, [
-            'label' => __('Default Country', 'acf-country-field'),
-            'instructions' => __('Select the default country for new fields', 'acf-country-field'),
-            'type' => 'select',
-            'name' => 'default_country',
-            'choices' => $this->repository->getCountries(),
-            'default_value' => LocationRepository::USA_COUNTRY_ID,
-        ]);
-
-        // Show city setting
-        acf_render_field_setting($field, [
-            'label' => __('Show City Field', 'acf-country-field'),
-            'instructions' => __('Display the city selection field', 'acf-country-field'),
-            'type' => 'true_false',
-            'name' => 'show_city',
-            'ui' => 1,
-            'default_value' => 1,
-        ]);
-
-        // Show state setting
-        acf_render_field_setting($field, [
-            'label' => __('Show State Field', 'acf-country-field'),
-            'instructions' => __('Display the state field (US only)', 'acf-country-field'),
-            'type' => 'true_false',
-            'name' => 'show_state',
-            'ui' => 1,
-            'default_value' => 1,
-        ]);
-    }
-
-    /**
-     * Render the field input.
-     *
-     * @param array<string, mixed> $field The field configuration and value
-     */
-    public function render_field(array $field): void
-    {
-        $value = $field['value'] ?? [];
-
-        $country_id = (int) ($value['country_id'] ?? $field['default_country'] ?? LocationRepository::USA_COUNTRY_ID);
-        $city_id = (int) ($value['city_id'] ?? 0);
-        $state_id = (int) ($value['state_id'] ?? 0);
-
-        $show_city = $field['show_city'] ?? true;
-        $show_state = $field['show_state'] ?? true;
-
-        $countries = $this->repository->getCountries();
-        $cities = $show_city ? $this->repository->getCitiesByCountry($country_id) : [];
-        $states = ($show_state && $this->repository->isUnitedStates($country_id))
-            ? $this->repository->getStates()
-            : [];
-
-        $field_name = esc_attr($field['name']);
-        ?>
-        <div class="acf-country-field-wrapper" data-usa-id="<?php echo esc_attr((string) LocationRepository::USA_COUNTRY_ID); ?>">
-            <ul class="acf-country-selector-list">
-                <?php $this->renderCountrySelect($field_name, $countries, $country_id); ?>
-
-                <?php if ($show_city): ?>
-                    <?php $this->renderCitySelect($field_name, $cities, $city_id); ?>
-                <?php endif; ?>
-
-                <?php if ($show_state): ?>
-                    <?php $this->renderStateSelect($field_name, $states, $state_id); ?>
-                <?php endif; ?>
-            </ul>
-            <?php wp_nonce_field(LocationAjaxHandler::NONCE_ACTION, LocationAjaxHandler::NONCE_KEY); ?>
-        </div>
-        <?php
-    }
-
-    /**
-     * Render the country select field.
-     *
-     * @param array<int, string> $countries
-     */
-    private function renderCountrySelect(string $field_name, array $countries, int $selected_id): void
-    {
-        ?>
-        <li class="acf-country-field-item acf-country-field-country">
-            <div class="acf-field-inner">
-                <label>
-                    <strong><?php echo esc_html__('Select your country', 'acf-country-field'); ?></strong>
-                </label>
-                <select name="<?php echo esc_attr($field_name); ?>[country_id]" class="acf-country-select">
-                    <option value=""><?php echo esc_html__('Choose a country...', 'acf-country-field'); ?></option>
-                    <?php foreach ($countries as $id => $name): ?>
-                        <option value="<?php echo esc_attr((string) $id); ?>" <?php selected($selected_id, $id); ?>>
-                            <?php echo esc_html($name); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        </li>
-        <?php
-    }
-
-    /**
-     * Render the city select field.
-     *
-     * @param array<int, string> $cities
-     */
-    private function renderCitySelect(string $field_name, array $cities, int $selected_id): void
-    {
-        ?>
-        <li class="acf-country-field-item acf-country-field-city">
-            <div class="acf-loading-indicator" style="display: none;">
-                <span class="acf-spinner"></span>
-            </div>
-            <div class="acf-field-inner">
-                <label>
-                    <strong><?php echo esc_html__('Select your city', 'acf-country-field'); ?></strong>
-                </label>
-                <select name="<?php echo esc_attr($field_name); ?>[city_id]" class="acf-city-select">
-                    <option value=""><?php echo esc_html__('Select your city...', 'acf-country-field'); ?></option>
-                    <?php foreach ($cities as $id => $name): ?>
-                        <option value="<?php echo esc_attr((string) $id); ?>" <?php selected($selected_id, $id); ?>>
-                            <?php echo esc_html($name); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        </li>
-        <?php
-    }
-
-    /**
-     * Render the state select field (US only).
-     *
-     * @param array<int, string> $states
-     */
-    private function renderStateSelect(string $field_name, array $states, int $selected_id): void
-    {
-        $hidden = empty($states) ? 'style="display: none;"' : '';
-        ?>
-        <li class="acf-country-field-item acf-country-field-state" <?php echo $hidden; ?>>
-            <div class="acf-loading-indicator" style="display: none;">
-                <span class="acf-spinner"></span>
-            </div>
-            <div class="acf-field-inner">
-                <label>
-                    <strong><?php echo esc_html__('Select your state', 'acf-country-field'); ?></strong>
-                </label>
-                <select name="<?php echo esc_attr($field_name); ?>[state_id]" class="acf-state-select">
-                    <option value=""><?php echo esc_html__('Select your state...', 'acf-country-field'); ?></option>
-                    <?php foreach ($states as $id => $name): ?>
-                        <option value="<?php echo esc_attr((string) $id); ?>" <?php selected($selected_id, $id); ?>>
-                            <?php echo esc_html($name); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        </li>
-        <?php
-    }
-
-    /**
-     * Enqueue admin scripts and styles.
-     */
-    public function input_admin_enqueue_scripts(): void
-    {
-        $version = $this->settings['version'];
-        $dir = plugin_dir_url(dirname(__DIR__) . '/acf-country-field.php');
-
-        // Register scripts
-        wp_register_script(
-            'acf-country-field-input',
-            $dir . 'js/input.js',
-            ['acf-input', 'jquery'],
-            $version,
-            true
-        );
-
-        wp_register_script(
-            'acf-chosen',
-            $dir . 'js/chosen.jquery.min.js',
-            ['jquery'],
-            $version,
-            true
-        );
-
-        // Register styles
-        wp_register_style(
-            'acf-country-field-input',
-            $dir . 'css/input.css',
-            ['acf-input'],
-            $version
-        );
-
-        wp_register_style(
-            'acf-chosen',
-            $dir . 'css/chosen.min.css',
-            [],
-            $version
-        );
-
-        // Localize script with AJAX data and nonce
-        wp_localize_script('acf-country-field-input', 'acfCountryField', [
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => LocationAjaxHandler::createNonce(),
-            'nonceKey' => LocationAjaxHandler::NONCE_KEY,
-            'usaCountryId' => LocationRepository::USA_COUNTRY_ID,
-            'i18n' => [
-                'chooseCountry' => __('Choose a country...', 'acf-country-field'),
-                'selectCity' => __('Select your city...', 'acf-country-field'),
-                'selectState' => __('Select your state...', 'acf-country-field'),
-            ],
-        ]);
-
-        // Enqueue
-        wp_enqueue_script('acf-country-field-input');
-        wp_enqueue_script('acf-chosen');
-        wp_enqueue_style('acf-country-field-input');
-        wp_enqueue_style('acf-chosen');
-    }
-
-    /**
-     * Prepare value for saving to database.
-     *
-     * @param mixed $value The field value
-     * @param int|string $post_id The post ID
-     * @param array<string, mixed> $field The field configuration
-     * @return array<string, mixed> The prepared value
-     */
-    public function update_value($value, $post_id, array $field): array
-    {
-        if (!is_array($value)) {
-            $value = [];
-        }
-
-        $country_id = (int) ($value['country_id'] ?? 0);
-        $city_id = (int) ($value['city_id'] ?? 0);
-        $state_id = (int) ($value['state_id'] ?? 0);
-
-        return [
-            'country_id' => $country_id,
-            'country_name' => $this->repository->getCountry($country_id) ?? '',
-            'city_id' => $city_id,
-            'city_name' => $this->repository->getCity($city_id) ?? '',
-            'state_id' => $state_id,
-            'state_name' => $state_id > 0 ? ($this->repository->getState($state_id) ?? '') : '',
+        $this->name = static::TYPE;
+        $this->label = __('Country', self::TEXT_DOMAIN);
+        $this->category = 'choice';
+        $this->description = __('Select a country and city. US addresses also get a state.', self::TEXT_DOMAIN);
+        $this->defaults = [
+            'default_country' => LocationRepository::USA_COUNTRY_ID,
+            'show_state' => 1,
+            'show_city' => 1,
         ];
     }
 
     /**
-     * Format value for frontend display.
-     *
-     * @param mixed $value The field value
-     * @param int|string $post_id The post ID
-     * @param array<string, mixed> $field The field configuration
-     * @return array<string, mixed>|null The formatted value
+     * @param array<string, mixed> $field
      */
-    public function format_value($value, $post_id, array $field, $escape_html = false): ?array
+    public function render_field_settings(array $field): void
+    {
+        acf_render_field_setting($field, [
+            'label' => __('Default Country', self::TEXT_DOMAIN),
+            'instructions' => __('Selected when the field has no value yet.', self::TEXT_DOMAIN),
+            'type' => 'select',
+            'name' => 'default_country',
+            'choices' => $this->repository->getCountries(),
+            'allow_null' => 1,
+            'ui' => 1,
+        ]);
+
+        acf_render_field_setting($field, [
+            'label' => __('Show State', self::TEXT_DOMAIN),
+            'instructions' => __('Shown for the United States. The state narrows the city list.', self::TEXT_DOMAIN),
+            'type' => 'true_false',
+            'name' => 'show_state',
+            'ui' => 1,
+        ]);
+
+        acf_render_field_setting($field, [
+            'label' => __('Show City', self::TEXT_DOMAIN),
+            'type' => 'true_false',
+            'name' => 'show_city',
+            'ui' => 1,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     */
+    public function render_field(array $field): void
+    {
+        $show_state = !empty($field['show_state']);
+        $show_city = !empty($field['show_city']);
+
+        if (is_array($field['value'] ?? null)) {
+            $location = $this->normalize($field['value']);
+        } else {
+            $location = $this->normalize(['country_id' => $field['default_country'] ?? 0]);
+        }
+
+        $country_id = $location['country_id'];
+        $state_id = $location['state_id'];
+        $is_usa = $this->repository->isUnitedStates($country_id);
+        $filter_by_state = $show_state && $is_usa;
+
+        // Version 1 saved US cities without linking them to the state, so take the state from the city.
+        if ($filter_by_state && $show_city && $location['city_id'] > 0) {
+            $city = $this->repository->getCity($location['city_id']);
+
+            if ($city !== null && $city['country_id'] === $country_id && $city['state_id'] > 0) {
+                $state_id = $city['state_id'];
+            }
+        }
+
+        $cities = [];
+
+        if ($show_city && $country_id > 0 && (!$filter_by_state || $state_id > 0)) {
+            $cities = $this->repository->getCities($country_id, $filter_by_state ? $state_id : 0);
+        }
+
+        if ($filter_by_state && $state_id === 0) {
+            $city_placeholder = __('Select a state first', self::TEXT_DOMAIN);
+        } else {
+            $city_placeholder = __('Select a city', self::TEXT_DOMAIN);
+        }
+
+        $id = (string) $field['id'];
+        $name = (string) $field['name'];
+
+        echo '<div class="acf-country-field">';
+
+        $this->renderSelect(
+            'country',
+            __('Country', self::TEXT_DOMAIN),
+            $id,
+            $name,
+            $this->repository->getCountries(),
+            $country_id,
+            __('Select a country', self::TEXT_DOMAIN)
+        );
+
+        if ($show_state) {
+            $this->renderSelect(
+                'state',
+                __('State', self::TEXT_DOMAIN),
+                $id,
+                $name,
+                $is_usa ? $this->repository->getStates() : [],
+                $state_id,
+                __('Select a state', self::TEXT_DOMAIN),
+                !$is_usa
+            );
+        }
+
+        if ($show_city) {
+            $this->renderSelect(
+                'city',
+                __('City', self::TEXT_DOMAIN),
+                $id,
+                $name,
+                $cities,
+                $location['city_id'],
+                $city_placeholder
+            );
+        }
+
+        echo '</div>';
+    }
+
+    /**
+     * @param array<int, string> $choices
+     */
+    private function renderSelect(
+        string $part,
+        string $label,
+        string $field_id,
+        string $field_name,
+        array $choices,
+        int $selected,
+        string $placeholder,
+        bool $hidden = false
+    ): void {
+        $id = $field_id . '-' . $part;
+
+        printf(
+            '<div class="acf-country-field__part" data-part="%s"%s><label for="%s">%s</label><select id="%s" name="%s"%s>',
+            esc_attr($part),
+            $hidden ? ' hidden' : '',
+            esc_attr($id),
+            esc_html($label),
+            esc_attr($id),
+            esc_attr($field_name . '[' . $part . '_id]'),
+            $choices === [] && $part !== 'country' ? ' disabled' : ''
+        );
+
+        printf('<option value="">%s</option>', esc_html($placeholder));
+
+        foreach ($choices as $value => $text) {
+            printf(
+                '<option value="%d"%s>%s</option>',
+                $value,
+                $value === $selected ? ' selected' : '',
+                esc_html($text)
+            );
+        }
+
+        echo '</select></div>';
+    }
+
+    public function input_admin_enqueue_scripts(): void
+    {
+        // The legacy field type shares these assets.
+        if (wp_script_is(self::HANDLE, 'enqueued')) {
+            return;
+        }
+
+        $url = plugin_dir_url($this->plugin_file);
+
+        wp_enqueue_style(self::HANDLE, $url . 'css/input.css', ['acf-input'], Plugin::VERSION);
+        wp_enqueue_script(self::HANDLE, $url . 'js/input.js', ['acf-input', 'jquery'], Plugin::VERSION, true);
+
+        $states = [];
+
+        foreach ($this->repository->getStates() as $id => $name) {
+            $states[] = ['id' => $id, 'name' => $name];
+        }
+
+        $config = [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'action' => LocationAjaxHandler::ACTION,
+            'nonce' => wp_create_nonce(LocationAjaxHandler::NONCE_ACTION),
+            'usaId' => LocationRepository::USA_COUNTRY_ID,
+            'states' => $states,
+            'i18n' => [
+                'selectState' => __('Select a state', self::TEXT_DOMAIN),
+                'selectStateFirst' => __('Select a state first', self::TEXT_DOMAIN),
+                'selectCity' => __('Select a city', self::TEXT_DOMAIN),
+                'loading' => __('Loading…', self::TEXT_DOMAIN),
+                'loadFailed' => __('Couldn’t load cities', self::TEXT_DOMAIN),
+            ],
+        ];
+
+        wp_add_inline_script(self::HANDLE, 'window.acfCountryField = ' . wp_json_encode($config) . ';', 'before');
+    }
+
+    /**
+     * Fixes IDs in values saved by version 1, using the names stored with them. Version 1.0.1
+     * numbered countries differently, and version 1 listed some states twice.
+     *
+     * @param mixed $value
+     * @param int|string $post_id
+     * @param array<string, mixed> $field
+     * @return mixed
+     */
+    public function load_value($value, $post_id, array $field)
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        $country_id = $this->toId($value['country_id'] ?? 0);
+        $country_name = $this->toName($value['country_name'] ?? '');
+
+        if ($country_id > 0 && $country_name !== '' && $this->repository->getCountry($country_id) !== $country_name) {
+            $value['country_id'] = $this->repository->findCountryId($country_name) ?? $country_id;
+        }
+
+        $state_id = $this->toId($value['state_id'] ?? 0);
+        $state_name = $this->toName($value['state_name'] ?? '');
+
+        if ($state_id > 0 && $state_name !== '' && $this->repository->getState($state_id) !== $state_name) {
+            $value['state_id'] = $this->repository->findStateId($state_name) ?? $state_id;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Saves the IDs with their names, dropping a state or city that doesn't belong to the country.
+     *
+     * @param mixed $value
+     * @param int|string $post_id
+     * @param array<string, mixed> $field
+     * @return Location
+     */
+    public function update_value($value, $post_id, array $field): array
+    {
+        $value = is_array($value) ? $value : [];
+
+        $country_id = $this->toId($value['country_id'] ?? 0);
+        $state_id = $this->toId($value['state_id'] ?? 0);
+        $city_id = $this->toId($value['city_id'] ?? 0);
+
+        $country_name = $this->repository->getCountry($country_id);
+
+        if ($country_name === null) {
+            return $this->normalize([]);
+        }
+
+        $city = $this->repository->getCity($city_id);
+
+        if ($city === null || $city['country_id'] !== $country_id) {
+            $city = null;
+        }
+
+        if (!$this->repository->isUnitedStates($country_id)) {
+            $state_id = 0;
+        } elseif ($city !== null && $city['state_id'] > 0) {
+            // A US city belongs to one state.
+            $state_id = $city['state_id'];
+        }
+
+        $state_name = $state_id > 0 ? $this->repository->getState($state_id) : null;
+
+        return [
+            'country_id' => $country_id,
+            'country_name' => $country_name,
+            'state_id' => $state_name === null ? 0 : $state_id,
+            'state_name' => $state_name ?? '',
+            'city_id' => $city === null ? 0 : $city['id'],
+            'city_name' => $city === null ? '' : $city['name'],
+        ];
+    }
+
+    /**
+     * Returns the saved location, or null when the field has never been saved.
+     *
+     * @param mixed $value
+     * @param int|string $post_id
+     * @param array<string, mixed> $field
+     * @return Location|null
+     */
+    public function format_value($value, $post_id, array $field): ?array
     {
         if (!is_array($value)) {
             return null;
         }
 
-        // Ensure names are populated (for backwards compatibility with old data)
-        $country_id = (int) ($value['country_id'] ?? 0);
-        $city_id = (int) ($value['city_id'] ?? 0);
-        $state_id = (int) ($value['state_id'] ?? 0);
+        $location = $this->normalize($value);
 
+        // Values saved by version 1 can be missing names.
+        if ($location['country_name'] === '' && $location['country_id'] > 0) {
+            $location['country_name'] = $this->repository->getCountry($location['country_id']) ?? '';
+        }
+
+        if ($location['state_name'] === '' && $location['state_id'] > 0) {
+            $location['state_name'] = $this->repository->getState($location['state_id']) ?? '';
+        }
+
+        if ($location['city_name'] === '' && $location['city_id'] > 0) {
+            $location['city_name'] = $this->repository->getCity($location['city_id'])['name'] ?? '';
+        }
+
+        return $location;
+    }
+
+    /**
+     * @param bool|string $valid
+     * @param mixed $value
+     * @param array<string, mixed> $field
+     * @param string $input
+     * @return bool|string
+     */
+    public function validate_value($valid, $value, array $field, $input)
+    {
+        if ($valid !== true) {
+            return $valid;
+        }
+
+        if (!empty($field['required']) && (!is_array($value) || $this->toId($value['country_id'] ?? 0) === 0)) {
+            return __('Select a country.', self::TEXT_DOMAIN);
+        }
+
+        return $valid;
+    }
+
+    /**
+     * @param array<mixed> $value
+     * @return Location
+     */
+    private function normalize(array $value): array
+    {
         return [
-            'country_id' => $country_id,
-            'country_name' => $value['country_name'] ?? $this->repository->getCountry($country_id) ?? '',
-            'city_id' => $city_id,
-            'city_name' => $value['city_name'] ?? $this->repository->getCity($city_id) ?? '',
-            'state_id' => $state_id,
-            'state_name' => $value['state_name'] ?? ($state_id > 0 ? $this->repository->getState($state_id) : '') ?? '',
+            'country_id' => $this->toId($value['country_id'] ?? 0),
+            'country_name' => $this->toName($value['country_name'] ?? ''),
+            'state_id' => $this->toId($value['state_id'] ?? 0),
+            'state_name' => $this->toName($value['state_name'] ?? ''),
+            'city_id' => $this->toId($value['city_id'] ?? 0),
+            'city_name' => $this->toName($value['city_name'] ?? ''),
         ];
     }
 
     /**
-     * Validate the field value.
-     *
-     * @param bool|string $valid Whether the field is valid
-     * @param mixed $value The field value
-     * @param array<string, mixed> $field The field configuration
-     * @param string $input The input name
-     * @return bool|string True if valid, error message otherwise
+     * @param mixed $value
      */
-    public function validate_value($valid, $value, array $field, string $input)
+    private function toId($value): int
     {
-        if (!$valid) {
-            return $valid;
-        }
+        return is_numeric($value) && (int) $value > 0 ? (int) $value : 0;
+    }
 
-        // If required, ensure country is selected
-        if ($field['required'] && empty($value['country_id'])) {
-            return __('Please select a country', 'acf-country-field');
-        }
-
-        return $valid;
+    /**
+     * Version 1 stored false for names it couldn't find.
+     *
+     * @param mixed $value
+     */
+    private function toName($value): string
+    {
+        return is_string($value) ? $value : '';
     }
 }

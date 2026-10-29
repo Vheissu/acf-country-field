@@ -1,30 +1,19 @@
 <?php
 
-declare(strict_types=1);
-
 /**
- * Uninstall script for ACF Country Field.
+ * Removes the location tables and stored options when the plugin is deleted.
  *
- * This file is called when the plugin is uninstalled (deleted).
- * It removes all plugin data including database tables.
+ * Saved field values are left alone. They include the country, state and city names.
  *
  * @package AcfCountryField
  */
 
-// Prevent direct access
+declare(strict_types=1);
+
 if (!defined('WP_UNINSTALL_PLUGIN')) {
     exit;
 }
 
-// Load autoloader
-$autoloader = __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/autoload.php';
 
-if (file_exists($autoloader)) {
-    require_once $autoloader;
-} else {
-    // Manual class loading
-    require_once __DIR__ . '/src/Database/Installer.php';
-}
-
-// Run uninstall
 AcfCountryField\Plugin::uninstall();

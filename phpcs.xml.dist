@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<ruleset name="ACF Country Field">
+    <description>PSR-12, with snake_case methods allowed where ACF requires them.</description>
+
+    <file>acf-country-field.php</file>
+    <file>autoload.php</file>
+    <file>uninstall.php</file>
+    <file>src</file>
+    <file>tests</file>
+
+    <arg name="colors"/>
+    <arg value="sp"/>
+
+    <rule ref="PSR12">
+        <exclude name="Generic.Files.LineLength"/>
+    </rule>
+
+    <!-- ACF calls field type methods such as render_field() and update_value() by name. -->
+    <rule ref="PSR1.Methods.CamelCapsMethodName">
+        <exclude-pattern>src/Fields/*</exclude-pattern>
+    </rule>
+
+    <!-- Entry files define constants and register hooks by design. -->
+    <rule ref="PSR1.Files.SideEffects">
+        <exclude-pattern>acf-country-field.php</exclude-pattern>
+        <exclude-pattern>autoload.php</exclude-pattern>
+        <exclude-pattern>uninstall.php</exclude-pattern>
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+</ruleset>

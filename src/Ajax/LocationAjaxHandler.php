@@ -7,136 +7,57 @@ namespace AcfCountryField\Ajax;
 use AcfCountryField\Repositories\LocationRepository;
 
 /**
- * Handles AJAX requests for location data.
+ * Serves city lists to the field's script.
  *
- * Includes proper security measures:
- * - Nonce verification for CSRF protection
- * - Capability checks for authorization
- * - Input sanitization
+ * Location data is public, so the endpoint is open to logged-out visitors for front-end forms
+ * made with acf_form(). The nonce stops other sites from using it.
  */
 class LocationAjaxHandler
 {
-    public const NONCE_ACTION = 'acf_country_field_nonce';
-    public const NONCE_KEY = 'acf_country_nonce';
+    public const ACTION = 'acf_country_field_cities';
+    public const NONCE_ACTION = 'acf_country_field';
 
-    private LocationRepository $repository;
+    private ?LocationRepository $repository;
 
     public function __construct(?LocationRepository $repository = null)
     {
-        $this->repository = $repository ?? new LocationRepository();
+        $this->repository = $repository;
     }
 
-    /**
-     * Register AJAX action hooks.
-     */
     public function register(): void
     {
-        // Logged-in users only (admin area)
-        add_action('wp_ajax_acf_get_country_cities', [$this, 'handleGetCities']);
-        add_action('wp_ajax_acf_get_us_states', [$this, 'handleGetStates']);
-
-        // Legacy action names for backwards compatibility
-        add_action('wp_ajax_get_country_cities', [$this, 'handleGetCitiesLegacy']);
-        add_action('wp_ajax_get_us_states', [$this, 'handleGetStatesLegacy']);
+        add_action('wp_ajax_' . self::ACTION, [$this, 'handleGetCities']);
+        add_action('wp_ajax_nopriv_' . self::ACTION, [$this, 'handleGetCities']);
     }
 
     /**
-     * Handle AJAX request to get cities for a country.
+     * Responds with the cities for `country_id`, limited to `state_id` when it's set, as a list of
+     * `{id, name}` objects sorted by name. A list keeps the order, which a JSON object keyed by ID wouldn't.
      */
     public function handleGetCities(): void
     {
-        $this->verifyRequest();
-
-        $country_id = $this->getIntParam('country_id');
-
-        if ($country_id <= 0) {
-            wp_send_json_error(['message' => 'Invalid country ID'], 400);
+        if (!check_ajax_referer(self::NONCE_ACTION, 'nonce', false)) {
+            wp_send_json_error(['message' => __('Your session has expired. Reload the page and try again.', 'acf-country-field')], 403);
         }
 
-        $cities = $this->repository->getCitiesByCountry($country_id);
+        $country_id = isset($_POST['country_id']) ? absint(wp_unslash($_POST['country_id'])) : 0;
+        $state_id = isset($_POST['state_id']) ? absint(wp_unslash($_POST['state_id'])) : 0;
+
+        if ($country_id <= 0) {
+            wp_send_json_error(['message' => __('Choose a country.', 'acf-country-field')], 400);
+        }
+
+        $cities = [];
+
+        foreach ($this->repository()->getCities($country_id, $state_id) as $id => $name) {
+            $cities[] = ['id' => $id, 'name' => $name];
+        }
+
         wp_send_json_success($cities);
     }
 
-    /**
-     * Handle AJAX request to get US states.
-     */
-    public function handleGetStates(): void
+    private function repository(): LocationRepository
     {
-        $this->verifyRequest();
-
-        $states = $this->repository->getStates();
-        wp_send_json_success($states);
-    }
-
-    /**
-     * Legacy handler for backwards compatibility.
-     * Uses less strict validation for older JS code.
-     */
-    public function handleGetCitiesLegacy(): void
-    {
-        // Check for legacy 'countryId' parameter name
-        $country_id = isset($_POST['countryId'])
-            ? absint($_POST['countryId'])
-            : $this->getIntParam('country_id');
-
-        if ($country_id <= 0) {
-            wp_send_json([]);
-            return;
-        }
-
-        $cities = $this->repository->getCitiesByCountry($country_id);
-        wp_send_json($cities);
-    }
-
-    /**
-     * Legacy handler for backwards compatibility.
-     */
-    public function handleGetStatesLegacy(): void
-    {
-        $states = $this->repository->getStates();
-        wp_send_json($states);
-    }
-
-    /**
-     * Verify the AJAX request is valid and authorized.
-     *
-     * @throws \WP_Error If verification fails
-     */
-    private function verifyRequest(): void
-    {
-        // Verify nonce
-        if (!check_ajax_referer(self::NONCE_ACTION, self::NONCE_KEY, false)) {
-            wp_send_json_error(['message' => 'Security check failed'], 403);
-        }
-
-        // Verify user capability
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error(['message' => 'Unauthorized'], 403);
-        }
-    }
-
-    /**
-     * Get an integer parameter from POST data.
-     *
-     * @param string $key The parameter key
-     * @return int The sanitized integer value
-     */
-    private function getIntParam(string $key): int
-    {
-        if (!isset($_POST[$key])) {
-            return 0;
-        }
-
-        return absint($_POST[$key]);
-    }
-
-    /**
-     * Create a nonce for AJAX requests.
-     *
-     * @return string The nonce value
-     */
-    public static function createNonce(): string
-    {
-        return wp_create_nonce(self::NONCE_ACTION);
+        return $this->repository ??= new LocationRepository();
     }
 }

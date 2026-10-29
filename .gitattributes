@@ -1,0 +1,11 @@
+# Keep development files out of `git archive` release zips.
+/.github export-ignore
+/tests export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/composer.json export-ignore
+/phpcs.xml.dist export-ignore
+/phpstan.neon.dist export-ignore
+/phpunit.xml export-ignore
+/CHANGELOG.md export-ignore
+/patchwork.json export-ignore

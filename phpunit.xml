@@ -15,13 +15,13 @@
         </testsuite>
     </testsuites>
 
-    <coverage>
+    <source>
         <include>
             <directory suffix=".php">src</directory>
         </include>
-    </coverage>
+    </source>
 
     <php>
-        <const name="ABSPATH" value="/var/www/html/" />
+        <const name="ABSPATH" value="/var/www/html/"/>
     </php>
 </phpunit>

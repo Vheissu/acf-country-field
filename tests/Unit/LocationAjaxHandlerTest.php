@@ -4,137 +4,88 @@ declare(strict_types=1);
 
 use AcfCountryField\Ajax\LocationAjaxHandler;
 use AcfCountryField\Repositories\LocationRepository;
-use AcfCountryField\Tests\TestCase;
+use Brain\Monkey\Actions;
 use Brain\Monkey\Functions;
 
-uses(TestCase::class);
-
 beforeEach(function (): void {
+    $_POST = [];
     $this->repository = Mockery::mock(LocationRepository::class);
     $this->handler = new LocationAjaxHandler($this->repository);
-});
+    $this->response = null;
 
-describe('LocationAjaxHandler', function (): void {
+    Functions\when('check_ajax_referer')->justReturn(1);
 
-    describe('createNonce', function (): void {
+    // The real functions end the request.
+    Functions\when('wp_send_json_success')->alias(function ($data): void {
+        $this->response = ['success' => true, 'data' => $data];
 
-        it('creates a nonce using WordPress function', function (): void {
-            $nonce = LocationAjaxHandler::createNonce();
-
-            expect($nonce)->toBeString()
-                ->and($nonce)->toBe('test_nonce_acf_country_field_nonce');
-        });
-
+        throw new RuntimeException('exit');
     });
+    Functions\when('wp_send_json_error')->alias(function ($data, $status): void {
+        $this->response = ['success' => false, 'data' => $data, 'status' => $status];
 
-    describe('handleGetCitiesLegacy', function (): void {
-
-        it('returns cities for valid country ID', function (): void {
-            $_POST['countryId'] = '446';
-
-            $expectedCities = [
-                100 => 'New York',
-                101 => 'Los Angeles',
-            ];
-
-            $this->repository->shouldReceive('getCitiesByCountry')
-                ->once()
-                ->with(446)
-                ->andReturn($expectedCities);
-
-            // Capture JSON output
-            try {
-                $this->handler->handleGetCitiesLegacy();
-            } catch (\Exception $e) {
-                $message = $e->getMessage();
-                expect($message)->toContain('wp_send_json');
-                expect($message)->toContain('New York');
-                expect($message)->toContain('Los Angeles');
-            }
-        });
-
-        it('returns empty array for invalid country ID', function (): void {
-            $_POST['countryId'] = '0';
-
-            // When country_id is 0, the handler returns early without calling the repository
-            // This is the expected behavior for invalid IDs
-
-            try {
-                $this->handler->handleGetCitiesLegacy();
-            } catch (\Exception $e) {
-                expect($e->getMessage())->toContain('wp_send_json: []');
-            }
-        });
-
-        it('sanitizes country ID input', function (): void {
-            $_POST['countryId'] = '446abc'; // Should be sanitized to 446
-
-            $this->repository->shouldReceive('getCitiesByCountry')
-                ->once()
-                ->with(446)
-                ->andReturn(['100' => 'Test City']);
-
-            try {
-                $this->handler->handleGetCitiesLegacy();
-            } catch (\Exception $e) {
-                expect($e->getMessage())->toContain('Test City');
-            }
-        });
-
+        throw new RuntimeException('exit');
     });
-
-    describe('handleGetStatesLegacy', function (): void {
-
-        it('returns all US states', function (): void {
-            $expectedStates = [
-                1 => 'Alabama',
-                5 => 'California',
-                33 => 'New York',
-            ];
-
-            $this->repository->shouldReceive('getStates')
-                ->once()
-                ->andReturn($expectedStates);
-
-            try {
-                $this->handler->handleGetStatesLegacy();
-            } catch (\Exception $e) {
-                $message = $e->getMessage();
-                expect($message)->toContain('wp_send_json');
-                expect($message)->toContain('Alabama');
-                expect($message)->toContain('California');
-                expect($message)->toContain('New York');
-            }
-        });
-
-        it('returns empty array when no states exist', function (): void {
-            $this->repository->shouldReceive('getStates')
-                ->once()
-                ->andReturn([]);
-
-            try {
-                $this->handler->handleGetStatesLegacy();
-            } catch (\Exception $e) {
-                expect($e->getMessage())->toContain('wp_send_json: []');
-            }
-        });
-
-    });
-
-    describe('constants', function (): void {
-
-        it('has correct nonce action constant', function (): void {
-            expect(LocationAjaxHandler::NONCE_ACTION)->toBe('acf_country_field_nonce');
-        });
-
-        it('has correct nonce key constant', function (): void {
-            expect(LocationAjaxHandler::NONCE_KEY)->toBe('acf_country_nonce');
-        });
-
-    });
-
 });
 
 afterEach(function (): void {
-    unset($_POST['countryId'], $_POST['country_id']);
+    $_POST = [];
+});
+
+function respond(LocationAjaxHandler $handler): void
+{
+    try {
+        $handler->handleGetCities();
+    } catch (RuntimeException $exit) {
+        expect($exit->getMessage())->toBe('exit');
+    }
+}
+
+it('registers the action for logged-in and logged-out users', function (): void {
+    Actions\expectAdded('wp_ajax_acf_country_field_cities')->once()->with([$this->handler, 'handleGetCities']);
+    Actions\expectAdded('wp_ajax_nopriv_acf_country_field_cities')->once()->with([$this->handler, 'handleGetCities']);
+
+    $this->handler->register();
+});
+
+it('returns cities as an ordered list', function (): void {
+    $_POST = ['country_id' => '248', 'state_id' => ''];
+    $this->repository->shouldReceive('getCities')->once()->with(248, 0)->andReturn([1060 => 'Adelaide', 1460 => 'Sydney']);
+
+    respond($this->handler);
+
+    expect($this->response)->toBe([
+        'success' => true,
+        'data' => [['id' => 1060, 'name' => 'Adelaide'], ['id' => 1460, 'name' => 'Sydney']],
+    ]);
+});
+
+it('passes the state through', function (): void {
+    $_POST = ['country_id' => '446', 'state_id' => '44'];
+    $this->repository->shouldReceive('getCities')->once()->with(446, 44)->andReturn([]);
+
+    respond($this->handler);
+
+    expect($this->response)->toBe(['success' => true, 'data' => []]);
+});
+
+it('rejects requests without a valid nonce', function (): void {
+    Functions\when('check_ajax_referer')->justReturn(false);
+    $_POST = ['country_id' => '248'];
+    $this->repository->shouldNotReceive('getCities');
+
+    respond($this->handler);
+
+    expect($this->response['success'])->toBeFalse()
+        ->and($this->response['status'])->toBe(403);
+});
+
+it('rejects requests without a country', function (): void {
+    $_POST = ['country_id' => 'abc'];
+    $this->repository->shouldNotReceive('getCities');
+
+    respond($this->handler);
+
+    expect($this->response['success'])->toBeFalse()
+        ->and($this->response['status'])->toBe(400);
 });
